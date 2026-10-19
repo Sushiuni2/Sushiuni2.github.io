@@ -51,11 +51,15 @@ function boxBlur(src, W, H, r) {
   return out;
 }
 
+const SWCACHE = new Map();
+
 export async function paintSwatch(cv) {
   if (cv.dataset.done) return;
   cv.dataset.done = "1";
-  await loadTex();
   const ds = cv.dataset;
+  const ck = [ds.c, ds.fab, ds.w, ds.h, ds.st, ds.hair, ds.seed, window.devicePixelRatio].join("|");
+  if (SWCACHE.has(ck)) { const im = SWCACHE.get(ck); cv.width = im.width; cv.height = im.height; cv.getContext("2d").putImageData(im, 0, 0); return; }
+  await loadTex();
   const wpt = +ds.w, hpt = +ds.h, col = ds.c.split(",").map(Number), kind = TEX[ds.fab] ? ds.fab : "knit";
   const stitches = ds.st === "1", hair = +ds.hair || 0.2;
   const r = makeRng(hash("swatch" + ds.seed));
@@ -142,14 +146,36 @@ export async function paintSwatch(cv) {
     o[i * 4 + 3] = Math.min(255, al * 255);
   }
   ctx.putImageData(img, 0, 0);
+  SWCACHE.set(ck, img);
+  if (SWCACHE.size > 200) SWCACHE.delete(SWCACHE.keys().next().value);
 }
 
 export const SWATCH_PAD = PAD;
 
 // 页面上新出现的面料小样，自动画上
+const queue = [];
+let pumping = false;
+const idle = window.requestIdleCallback || ((f) => setTimeout(() => f({ timeRemaining: () => 8 }), 16));
+function pump() {
+  if (pumping) return;
+  pumping = true;
+  idle(async function step(dl) {
+    while (queue.length && dl.timeRemaining() > 2) {
+      const cv = queue.shift();
+      if (cv.isConnected) await paintSwatch(cv);
+    }
+    if (queue.length) idle(step); else pumping = false;
+  });
+}
+function enqueue(cv) {
+  const ck = cv.dataset;
+  // 缓存里有的立刻贴上，其余排队空闲时画
+  if (SWCACHE.has([ck.c, ck.fab, ck.w, ck.h, ck.st, ck.hair, ck.seed, window.devicePixelRatio].join("|"))) paintSwatch(cv);
+  else { queue.push(cv); pump(); }
+}
 export function watchSwatches() {
-  const run = (root) => root.querySelectorAll?.("canvas.swc:not([data-done])").forEach(paintSwatch);
-  new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches?.("canvas.swc")) paintSwatch(n); else run(n); } })
+  const run = (root) => root.querySelectorAll?.("canvas.swc:not([data-done])").forEach(enqueue);
+  new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches?.("canvas.swc")) enqueue(n); else run(n); } })
     .observe(document.body, { childList: true, subtree: true });
   run(document);
 }

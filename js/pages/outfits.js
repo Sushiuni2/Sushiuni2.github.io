@@ -1,6 +1,6 @@
 // 2 搭配：衣柜是歌单。每一套是一首歌：A1、A2…（按穿过的次数排），还没穿出去过的放在 B 面。
 import { db, uid } from "../db.js";
-import { T, page, head, drawHead, ink, figure, tape, tapes, season, today, md, go, esc, toast, confirmSheet } from "../ui.js";
+import { T, page, head, drawHead, ink, figure, actions, onAct, season, today, md, go, esc, toast, confirmSheet } from "../ui.js";
 import { KINDS, noStr } from "../kinds.js";
 
 async function loadAll() {
@@ -33,7 +33,8 @@ export async function outfits() {
     <div class="list">${outfits.length ? [...worn, ...unworn].map(track).join("") :
       `<div class="empty">${T("还没有配过一套。", "l b")}<br>${T(items.length >= 2 ? "从衣柜里挑几件放在一起，起个名字。" : "先在衣柜里录几件衣服。", "m")}</div>`}</div>
     ${unworn.length ? `<p style="margin:12px 0 0">${T("* B 面是还没穿出去过的。", "s")}</p>` : ""}
-    ${tapes(tape("随机一套", { act: "rand", seed: 1, rot: -0.6 }), tape("配一套", { dark: true, act: "new", seed: 2, rot: 0.5 }))}
+    ${items.length >= 2 ? `<p style="margin:14px 0 0;text-align:right"><button class="rand" style="padding:8px 0">${T("随机配一套 →", "m b")}</button></p>` : ""}
+    ${actions({ text: "配一套", act: "new", dark: true })}
   `);
   return {
     el,
@@ -42,8 +43,9 @@ export async function outfits() {
       const L = el.querySelector(".list");
       ink(L, "ol" + outfits.length, (sh, box, W) => { for (const t of L.querySelectorAll(".track")) sh.rule(0, W, box(t).b, 0.32); });
       drawThumbs(el, byId);
-      el.querySelector('[data-act="new"]').onclick = () => go("#/outfits/new");
-      el.querySelector('[data-act="rand"]').onclick = () => {
+      onAct(el, { new: () => go("#/outfits/new") });
+      const rb = el.querySelector(".rand");
+      if (rb) rb.onclick = () => {
         const pick = (cats) => { const l = items.filter((i) => cats.includes(KINDS[i.kind]?.cat)); return l.length ? l[Math.floor(Math.random() * l.length)].id : null; };
         const ids = [pick(["上衣"]), Math.random() < 0.4 ? pick(["外套"]) : null, pick(["下装"]), pick(["鞋履"])].filter(Boolean);
         if (ids.length < 2) { toast("衣柜里的衣服还不够配一套"); return; }
@@ -68,7 +70,8 @@ export async function outfitView([id]) {
     </section>
     <section class="rel" style="margin-top:22px"><span class="h2">${T(`* 穿过 ${wears.length} 次`, "l b")}</span>
       <div class="dates">${wears.map((d) => `<span>${T(md(d), "m")}</span>`).join("") || T("还没穿过。", "m soft")}</div></section>
-    ${tapes(tape("改一改", { act: "edit", seed: 0, rot: 0.5 }), tape("今天穿这套", { dark: true, act: "wear", seed: 1, rot: -0.4 }))}
+    <p style="margin:18px 0 0"><a href="#/outfit/${o.id}/edit" style="padding:8px 0;display:inline-block">${T("改这一套", "m b")}</a></p>
+    ${actions({ text: o.wears?.includes(today()) ? "今天穿这套 ✓" : "今天穿这套", act: "wear", dark: true })}
   `, { detail: true });
   return {
     el,
@@ -77,8 +80,7 @@ export async function outfitView([id]) {
       const s = el.querySelector(".ov");
       ink(s, "ovt" + o.id, (sh, box) => { const t = box(s.querySelector(".title .ty")); sh.underline(t.x - 2, t.r, t.b + 2, 0.8, true); });
       for (const f of el.querySelectorAll(".fig")) figure(f, byId[f.dataset.id], { w: 0.62, pad: 8 });
-      el.querySelector('[data-act="edit"]').onclick = () => go(`#/outfit/${o.id}/edit`);
-      el.querySelector('[data-act="wear"]').onclick = async () => {
+      onAct(el, { wear: async () => {
         const d = today();
         o.wears = o.wears || [];
         if (o.wears.includes(d)) { toast("今天已经记过了"); return; }
@@ -86,8 +88,8 @@ export async function outfitView([id]) {
         await db.put("outfits", o);
         for (const it of its) { it.wears = it.wears || []; if (!it.wears.includes(d)) { it.wears.push(d); await db.put("items", it); } }
         toast("记下了，几件衣服也各记了一次");
-        setTimeout(() => go(`#/outfit/${o.id}?t=${Date.now()}`), 900);
-      };
+        go("", "refresh");
+      } });
     },
   };
 }
@@ -106,7 +108,7 @@ export async function outfitEdit([id], q = {}) {
       <div class="picker">${sorted.map((it) => `<button data-id="${it.id}" class="${sel.has(it.id) ? "on" : ""}"><span class="fig" data-id="${it.id}"></span>${T(noStr(it.no), "s")}</button>`).join("")}</div>
       ${old ? `<p style="margin:16px 0 0"><button class="del">${T("删掉这一套", "m soft")}</button></p>` : ""}
     </div>
-    ${tapes(tape("算了", { act: "cancel", seed: 2, rot: -0.5 }), tape("存这一套", { dark: true, act: "save", seed: 0, rot: 0.6 }))}
+    ${actions({ text: "存这一套", act: "save", dark: true })}
   `, { detail: true });
   const pk = () => el.querySelector(".picker");
   const circ = () => ink(pk(), "pk" + [...sel].join(""), (sh, box) => {
@@ -122,18 +124,18 @@ export async function outfitEdit([id], q = {}) {
         const b = e.target.closest(".picker button");
         if (b) { const id_ = b.dataset.id; sel.has(id_) ? sel.delete(id_) : sel.add(id_); b.classList.toggle("on"); circ(); return; }
         if (e.target.closest(".del")) {
-          if (await confirmSheet("删掉这一套？衣服不会删。", "删掉")) { await db.del("outfits", o.id); go("#/outfits"); }
+          if (await confirmSheet("删掉这一套？衣服不会删。", "删掉")) { await db.del("outfits", o.id); go("#/outfits", "reset"); }
           return;
         }
-        const act = e.target.closest("[data-act]")?.dataset.act;
-        if (act === "cancel") go(old ? `#/outfit/${o.id}` : "#/outfits");
-        if (act === "save") {
+      });
+      onAct(el, {
+        save: async () => {
           if (sel.size < 2) { toast("至少挑两件"); return; }
           o.name = el.querySelector('[data-f="name"]').value.trim();
           o.items = [...sel];
           await db.put("outfits", o);
-          go(`#/outfit/${o.id}`);
-        }
+          if (old) go(`#/outfit/${o.id}`, "up"); else go(`#/outfit/${o.id}`, "replace");
+        },
       });
     },
   };

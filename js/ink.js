@@ -60,6 +60,17 @@ function gauss1d(arr, sigma) {
   return out;
 }
 
+// 平滑的随机起伏：σ 大的时候不做长卷积，先在稀疏的点上取随机数再插值（结果差不多，快几十倍）
+function smoothNoise(rng, n, sigma) {
+  if (sigma <= 4) return gauss1d(Float32Array.from({ length: n }, () => rng.normal()), sigma);
+  const step = sigma / 2, k = Math.ceil(n / step) + 3;
+  const g = gauss1d(Float32Array.from({ length: k }, () => rng.normal()), 1.2);
+  const amp = Math.sqrt(1.2 / sigma);                  // 和直接卷积的起伏一样大
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) { const f = i / step, j = Math.floor(f), t = f - j; out[i] = (g[j] * (1 - t) + g[j + 1] * t) * amp; }
+  return out;
+}
+
 function resample(P, step) {
   const out = [P[0]];
   let carry = 0;
@@ -129,8 +140,8 @@ export class Sheet {
       if (keep > 3) P = P.slice(0, keep + 1);
     }
     const n = P.length;
-    const dx = gauss1d(Float32Array.from({ length: n }, () => rng.normal()), Math.max(2, n / 6));
-    const dy = gauss1d(Float32Array.from({ length: n }, () => rng.normal()), Math.max(2, n / 6));
+    const dx = smoothNoise(rng, n, Math.max(2, n / 6));
+    const dy = smoothNoise(rng, n, Math.max(2, n / 6));
     const amp = wob * 3 * Math.min(1, 140 / Math.max(n * 3, 1));
     P = P.map((p, i) => [p[0] + dx[i] * amp, p[1] + dy[i] * amp]);
     if (over) {
@@ -147,7 +158,7 @@ export class Sheet {
     if (m < 2) return;
     const tr = 0.06;
     const tx = gauss1d(Float32Array.from({ length: m }, () => rng.normal()), 2), ty = gauss1d(Float32Array.from({ length: m }, () => rng.normal()), 2);
-    let press = gauss1d(Float32Array.from({ length: m }, () => rng.normal()), Math.max(4, m / 5));
+    let press = smoothNoise(rng, m, Math.max(4, m / 5));
     const pm = Math.max(1e-6, ...Array.from(press, Math.abs));
     const heavy = rng() < 0.5;
     const R = new Float32Array(m);
@@ -253,24 +264,18 @@ export class Sheet {
     const r = this.rng, a = angle * Math.PI / 180;
     const u = [Math.cos(a), Math.sin(a)], nn = [-u[1], u[0]];
     const pu = poly.map((p) => p[0] * u[0] + p[1] * u[1]), pn = poly.map((p) => p[0] * nn[0] + p[1] * nn[1]);
-    const inside = (x, y) => {
-      let c = false;
-      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-        const [xi, yi] = poly[i], [xj, yj] = poly[j];
-        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
-      }
-      return c;
-    };
-    const umin = Math.min(...pu) - 2, umax = Math.max(...pu) + 2;
     const at = (s, t) => [u[0] * s + nn[0] * t, u[1] * s + nn[1] * t];
+    const N = poly.length;
     for (let t = Math.min(...pn) + r.uniform(0, gap); t < Math.max(...pn); t += gap * r.uniform(0.75, 1.3)) {
-      const N = 160, ss = [];
-      for (let i = 0; i < N; i++) { const s = umin + (umax - umin) * i / (N - 1); if (inside(...at(s, t))) ss.push(s); }
-      if (ss.length < 3) continue;
-      const runs = [[ss[0], ss[0]]];
-      const ds = (umax - umin) / (N - 1) * 1.5;
-      for (const s of ss.slice(1)) { const last = runs[runs.length - 1]; if (s - last[1] > ds) runs.push([s, s]); else last[1] = s; }
-      for (const [s0, s1] of runs) {
+      // 这条线和多边形各边的交点，两两一段
+      const xs = [];
+      for (let i = 0, j = N - 1; i < N; j = i++) {
+        if ((pn[i] > t) !== (pn[j] > t)) xs.push(pu[i] + (t - pn[i]) / (pn[j] - pn[i]) * (pu[j] - pu[i]));
+      }
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        const s0 = xs[k], s1 = xs[k + 1];
+        if (s1 - s0 < 2) continue;
         let cur = s0 + r.uniform(0, 3);
         while (cur < s1 - 2) {
           const e = Math.min(s1 - r.uniform(0, 2), cur + r.uniform(...seg));

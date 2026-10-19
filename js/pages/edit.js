@@ -1,7 +1,7 @@
 // 录一件 / 改一件：像一张印好的规格单，每行的选项打好了字，点一下就是用笔圈一个；上面的稿跟着重画。
 // 必填只有类型和颜色；内标和尺寸可以以后再补。
 import { db, uid, body as getBody, savePhoto, photoColor } from "../db.js";
-import { T, page, head, drawHead, ink, figure, swatch, tape, tapes, toast, confirmSheet, go, esc, rgb } from "../ui.js";
+import { T, page, head, drawHead, ink, figure, swatch, actions, onAct, toast, confirmSheet, go, esc, rgb } from "../ui.js";
 import { KINDS, PARAMS, defaults, FABRICS, PALETTE, noStr, sizesFor } from "../kinds.js";
 
 const KIND_ORDER = ["cardigan", "shirt", "jacket", "tee", "trousers", "derby", "chain"];
@@ -11,13 +11,16 @@ export async function edit([id], q = {}) {
   const nextNo = Math.max(0, ...items.map((i) => i.no || 0)) + 1;
   const old = id ? await db.get("items", id) : null;
   if (id && !old) throw new Error("找不到这件衣服");
+  const wish = q.wish ? await db.get("wishes", q.wish) : null;
   const it = old ? structuredClone(old) : {
-    id: uid(), no: nextNo, kind: "cardigan", params: defaults("cardigan"), name: q.name || "", color: null, colorName: "",
-    fabric: "knit", sizes: {}, wears: [], created: new Date().toISOString(), price: q.price ? +q.price : "", fromWish: q.wish || "",
+    id: uid(), no: nextNo, kind: "cardigan", params: defaults("cardigan"), name: wish?.name || "", color: wish?.color || null, colorName: "",
+    fabric: "knit", sizes: {}, wears: [], created: new Date().toISOString(), price: wish?.price || "", photo: wish?.photo || null,
+    origin: wish?.link || "", bought: wish ? new Date().toISOString().slice(0, 10) : "", fromWish: wish?.id || "",
   };
+  if (it.care && !String(it.composition || "").includes(it.care)) { it.composition = [it.composition, it.care].filter(Boolean).join("，"); delete it.care; }
   const bd = await getBody();
   const palette = [...bd.colors.map((c) => [c.name, c.rgb]), ...PALETTE].filter((c, i, a) => a.findIndex((d) => d[0] === c[0]) === i);
-  let photoCol = null;
+  let photoCol = null, nameT = 0;
   const total = items.filter((i) => !i.archived).length + (old ? 0 : 1);
 
   const optRow = (key, name, opts, val) => `<div class="row" data-key="${key}">${T(name, "m b")}<div class="opts">${opts.map(([v, n]) =>
@@ -25,7 +28,7 @@ export async function edit([id], q = {}) {
   const field = (key, name, ph = "", type = "text") => `<div class="row">${T(name, "m b")}<input class="field" data-f="${key}" type="${type}" placeholder="${esc(ph)}" value="${esc(it[key] ?? "")}" ${type === "number" ? 'inputmode="decimal"' : ""}></div>`;
 
   const el = page(`
-    ${head({ backTo: old ? `#/item/${it.id}` : "#/", backText: old ? "正面" : "衣柜", right: `${old ? "修改" : "新的一件"} · ${noStr(it.no)}` })}
+    ${head({ backTo: old ? `#/item/${it.id}` : wish ? `#/wish/${wish.id}` : "#/", backText: old ? "正面" : wish ? "想买" : "衣柜", right: `${old ? "修改" : "新的一件"} · ${noStr(it.no)}` })}
     <section class="preview"><div class="ptitle">${T("", "xl b")}</div><div class="fig"></div></section>
     <div class="form">
       <div class="row">${T("照片", "m b")}<div class="linkrow">
@@ -33,26 +36,24 @@ export async function edit([id], q = {}) {
         <label>${T("从相册选", "l")}<input type="file" accept="image/*" data-photo></label>
         <button class="rmphoto ${it.photo ? "" : "hide"}">${T("去掉", "l soft")}</button></div></div>
       <div class="kindrow">${optRow("kind", "类型", KIND_ORDER.map((k) => [k, KINDS[k].name]), it.kind)}</div>
-      <div class="params"></div>
+      <div class="params-wrap"><p class="ph-note" style="margin:10px 0 0">${T("没有照片时，用下面几项画一张稿：", "s")}</p><div class="params"></div></div>
       ${field("name", "名字", "比如：藏青开衫")}
       <div class="row" style="align-items:start;padding-top:12px">${T("颜色", "m b")}<div><div class="chips colors"></div>
         <input class="field" data-f="colorName" placeholder="颜色的名字" value="${esc(it.colorName || "")}" style="margin-top:4px"></div></div>
       ${optRow("fabric", "面料", FABRICS, it.fabric)}
       <button class="more">${T("＋ 内标和尺寸（可以以后再补）", "m b")}</button>
-      <div class="extra hide">
-        ${field("origin", "来处", "闲鱼、某家店、朋友给的…")}
-        ${field("year", "年代", "比如 2019", "number")}
+      <div class="extra ${old && (it.origin || it.price || it.composition || it.story) ? "" : "hide"}">
+        ${field("origin", "来处", "闲鱼、店名、谁送的")}
         <div class="row">${T("入手", "m b")}<input class="field" data-f="bought" type="date" value="${esc((it.bought || "").slice(0, 10))}"></div>
         ${field("price", "价格", "元", "number")}
-        ${field("composition", "成分", "羊毛 70 / 尼龙 30")}
-        ${field("care", "洗护", "冷水手洗，平铺阴干")}
-        <div class="row" style="align-items:start">${T("故事", "m b")}<textarea class="field" data-f="story" placeholder="它有什么来历？换过纽扣？谁送的？">${esc(it.story || "")}</textarea></div>
+        ${field("composition", "材质", "羊毛 70 / 尼龙 30，冷水手洗")}
+        <div class="row" style="align-items:start">${T("故事", "m b")}<textarea class="field" data-f="story" placeholder="它有什么来历？换过纽扣？">${esc(it.story || "")}</textarea></div>
         <div class="sizes"></div>
       </div>
       <p style="margin:18px 0 0">${T("* 只有类型和颜色要填，其余可以以后再补。", "s")}</p>
       ${old ? `<p style="margin:16px 0 0"><button class="del">${T("删掉这件", "m soft")}</button></p>` : ""}
     </div>
-    ${tapes(tape(old ? "不改了" : "不录了", { act: "cancel", seed: 1, rot: -0.7 }), tape(old ? "存好" : "收进衣柜", { dark: true, act: "save", seed: 2, rot: 0.6 }))}
+    ${actions({ text: old ? "存好" : "收进衣柜", act: "save", dark: true })}
   `, { detail: true });
 
   const $ = (s) => el.querySelector(s);
@@ -74,7 +75,8 @@ export async function edit([id], q = {}) {
   };
 
   const renderParams = () => {
-    const P = PARAMS[it.kind] || [];
+    const P = it.photo ? [] : PARAMS[it.kind] || [];
+    $(".params-wrap").classList.toggle("hide", !P.length);
     $(".params").innerHTML = P.map(([k, n, opts]) => optRow(k, n, opts, it.params?.[k])).join("");
     for (const r of el.querySelectorAll(".params .row")) circleRow(r);
     const S = sizesFor(it.kind);
@@ -122,17 +124,18 @@ export async function edit([id], q = {}) {
           return;
         }
         if (e.target.closest(".more")) { $(".extra").classList.toggle("hide"); return; }
-        if (e.target.closest(".rmphoto")) { it.photo = null; photoCol = null; $(".rmphoto").classList.add("hide"); renderColors(); preview(); return; }
+        if (e.target.closest(".rmphoto")) { it.photo = null; photoCol = null; $(".rmphoto").classList.add("hide"); renderParams(); renderColors(); preview(); return; }
         if (e.target.closest(".del")) {
           if (!(await confirmSheet(`删掉 ${noStr(it.no)} ${it.name || KINDS[it.kind].name}？删了就找不回来了。`, "删掉"))) return;
           await db.del("items", it.id);
-          if (it.photo) await db.del("photos", it.photo);
-          go("#/");
+          const usedByWish = it.photo && (await db.all("wishes")).some((w) => w.photo === it.photo);
+          if (it.photo && !usedByWish) await db.del("photos", it.photo);
+          go("#/", "reset");
           return;
         }
-        const act = e.target.closest("[data-act]")?.dataset.act;
-        if (act === "cancel") go(old ? `#/item/${it.id}` : "#/");
-        if (act === "save") {
+      });
+      onAct(el, {
+        save: async () => {
           if (!it.color) { toast("选一个颜色"); $(".colors").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
           for (const f of el.querySelectorAll("[data-f]")) it[f.dataset.f] = f.type === "number" ? (f.value === "" ? "" : +f.value) : f.value.trim();
           it.sizes = {};
@@ -141,11 +144,13 @@ export async function edit([id], q = {}) {
           await db.put("items", it);
           if (it.fromWish) { const w = await db.get("wishes", it.fromWish); if (w) { w.status = "bought"; w.itemId = it.id; w.closed = new Date().toISOString(); await db.put("wishes", w); } }
           toast(old ? "存好了" : `收进衣柜 · ${noStr(it.no)}`);
-          go(`#/item/${it.id}`);
-        }
+          if (old) go(`#/item/${it.id}`, "up");
+          else if (it.fromWish) go(["#/", `#/item/${it.id}`], "reset");
+          else go(`#/item/${it.id}`, "replace");
+        },
       });
       el.addEventListener("input", (e) => {
-        if (e.target.dataset.f === "name") { it.name = e.target.value.trim(); $(".ptitle").innerHTML = T("* " + (it.name || KINDS[it.kind].name), "xl b"); preview(); }
+        if (e.target.dataset.f === "name") { it.name = e.target.value.trim(); clearTimeout(nameT); nameT = setTimeout(preview, 350); }
         if (e.target.dataset.f === "colorName") it.colorName = e.target.value.trim();
         if (e.target.matches("[data-custom]")) {
           const v = e.target.value; it.color = [1, 3, 5].map((i) => parseInt(v.slice(i, i + 2), 16));
@@ -160,7 +165,7 @@ export async function edit([id], q = {}) {
         photoCol = await photoColor(it.photo).catch(() => null);
         if (photoCol && !it.color) { it.color = photoCol; }
         $(".rmphoto").classList.remove("hide");
-        renderColors(); preview();
+        renderParams(); renderColors(); preview();
       });
     },
   };

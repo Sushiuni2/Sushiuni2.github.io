@@ -1,8 +1,12 @@
 // 离线缓存（tools/make_sw.py 生成，别手改）。先用缓存打开，后台再取新的；版本变了就清掉旧缓存。
-const VERSION = "b95e4d05d5";
+const VERSION = "e916bf521d";
 const CACHE = "atelier-" + VERSION;
 const FILES = [
 "./",
+"assets/btn_full_dark.png",
+"assets/btn_full_light.png",
+"assets/btn_half_dark.png",
+"assets/btn_half_light.png",
 "assets/fab_jersey.png",
 "assets/fab_knit.png",
 "assets/fab_linen.png",
@@ -38,6 +42,7 @@ const FILES = [
 "js/garments.js",
 "js/ink.js",
 "js/kinds.js",
+"js/nav.js",
 "js/pages/body.js",
 "js/pages/edit.js",
 "js/pages/item.js",

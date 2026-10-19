@@ -2,6 +2,7 @@
 import { Sheet, makeRng, hash } from "./ink.js";
 import { drawInBox } from "./garments.js";
 import { photoURL } from "./db.js";
+import * as nav from "./nav.js";
 
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -9,19 +10,18 @@ export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&a
 
 // 打字：每个字的墨浓淡、高低都不一样（同样的字永远同样）
 export function ty(text, seed = "") {
+  // 墨的浓淡由整行共用的一张墨纹给（background-clip:text），每个字只有一点高低；中文比字母小一点
   const r = makeRng(hash(String(text) + "|" + seed));
   let out = "";
   for (const ch of String(text ?? "")) {
     if (ch === "\n") { out += "<br>"; continue; }
     if (ch === " ") { out += " "; continue; }
-    const o = r.uniform(0.7, 1).toFixed(2), y = r.normal(0, 0.22).toFixed(2);
-    const bx = Math.round(r() * 300), by = Math.round(r() * 300);
-    const cjk = ch.codePointAt(0) >= 0x2e80 ? ' class="c"' : "";
-    out += `<i${cjk} style="--o:${o};--y:${y}px;--bx:${bx}px;--by:${by}px">${esc(ch)}</i>`;
+    const y = r.normal(0, 0.22).toFixed(2);
+    out += ch.codePointAt(0) >= 0x2e80 ? `<i class="c" style="vertical-align:${-y}px">${esc(ch)}</i>` : `<i style="vertical-align:${-y}px">${esc(ch)}</i>`;
   }
   return out;
 }
-export const T = (text, cls = "", seed = "") => `<span class="ty ${cls}">${ty(text, seed)}</span>`;
+export const T = (text, cls = "", seed = "") => { const r = makeRng(hash("bg" + text + seed)); return `<span class="ty ${cls}" style="background-position:${r.int(0, 128)}px ${r.int(0, 128)}px">${ty(text, seed)}</span>`; };
 
 export function h(html) {
   const t = document.createElement("template");
@@ -31,7 +31,10 @@ export function h(html) {
 
 // ---------------------------------------------------------------- 墨：在一个容器上叠一层 canvas
 // draw(sh, box)：box(el) 给出元素相对容器的位置（CSS px）
-export function ink(container, seed, draw, bleed = 14) {
+const INKCACHE = new Map();
+function cachePut(k, v) { INKCACHE.set(k, v); if (INKCACHE.size > 160) INKCACHE.delete(INKCACHE.keys().next().value); }
+
+export function ink(container, seed, draw, bleed = 14, cacheKey = null) {
   if (getComputedStyle(container).position === "static") container.style.position = "relative";
   let c = container.querySelector(":scope > canvas.ink");
   if (!c) {
@@ -43,6 +46,14 @@ export function ink(container, seed, draw, bleed = 14) {
   const run = () => {
     const R = container.getBoundingClientRect();
     if (R.width < 1) return;
+    const key = cacheKey && `${cacheKey}|${Math.round(R.width)}x${Math.round(R.height)}`;
+    if (key && INKCACHE.has(key)) {
+      const bmp = INKCACHE.get(key);
+      c.width = bmp.width; c.height = bmp.height;
+      c.style.width = R.width + 2 * bleed + "px"; c.style.height = R.height + 2 * bleed + "px";
+      const x = c.getContext("2d"); x.clearRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0);
+      return;
+    }
     const sh = new Sheet(c, R.width + 2 * bleed, R.height + 2 * bleed, seed);
     sh.ctx.translate(bleed, bleed);
     const box = (el) => {
@@ -52,8 +63,10 @@ export function ink(container, seed, draw, bleed = 14) {
     draw(sh, box, R.width, R.height);
     sh.ctx.setTransform(sh.D, 0, 0, sh.D, 0, 0);
     sh.finish();
+    if (key) { const cp = document.createElement("canvas"); cp.width = c.width; cp.height = c.height; cp.getContext("2d").drawImage(c, 0, 0); cachePut(key, cp); }
   };
-  requestAnimationFrame(() => requestAnimationFrame(run));
+  if (container.isConnected && container.getBoundingClientRect().width > 0) run();
+  else requestAnimationFrame(run);
   return run;
 }
 
@@ -77,7 +90,7 @@ export function sketch(el, item, { w = 0.62, pad = 6, dims = null, params = null
       sh.pen([[x, ya], [x, yb]], 0.5, { over: 0, wob: 0.15 }); tick([x - 3, ya], [x + 3, ya]); tick([x - 3, yb], [x + 3, yb]);
       el.append(h(`<span class="dimnum" style="left:${x + 4}px;top:${(ya + yb) / 2 - 6}px">${T(dims.h, "m")}</span>`));
     }
-  }, 4);
+  }, 4, dims ? null : "sk" + item.id + seed + JSON.stringify(params || item.params || {}) + item.kind + w + pad);
 }
 
 // ---------------------------------------------------------------- 实物
@@ -154,8 +167,23 @@ export function season(iso) {
 export const daysSince = (iso) => Math.floor((Date.now() - new Date(iso).getTime()) / 864e5);
 
 // ---------------------------------------------------------------- 跳转
-export const go = (hash) => { location.hash = hash; };
-export const back = (fallback = "#/") => { if (history.state?.n || history.length > 2) history.back(); else go(fallback); };
+// go(hash)：往里走一层；go(hash, "up")：退回去；"replace"：原地换；"refresh"：重画这一页；"reset"：回到根（可带一串路径）
+export function go(hash, how = "push") {
+  if (how === "up") return nav.up(hash);
+  if (how === "replace") return nav.replace(hash);
+  if (how === "refresh") return nav.refresh();
+  if (how === "reset") return nav.reset(Array.isArray(hash) ? hash : [hash]);
+  return nav.push(hash);
+}
+
+// 固定在屏幕下方的按钮：一块或两块布标（主按钮是黑布）。点了在页面上发一个 "act" 事件
+export function actions(...btns) {
+  const list = btns.filter(Boolean);
+  const size = list.length === 1 ? "full" : "half";
+  return `<div class="actions n${list.length}">${list.map(({ text, act, dark }) =>
+    `<button class="btn ${dark ? "dark" : "light"}" data-act="${act}" style="background-image:url(assets/btn_${size}_${dark ? "dark" : "light"}.png)">${T(text, dark ? "light b" : "b", "btn")}</button>`).join("")}</div>`;
+}
+export const onAct = (el, map) => el.addEventListener("act", (e) => map[e.detail]?.());
 
 // 页面骨架：头部（返回 / 标题 / 右边小字），返回箭头用笔画
 export function page(inner, { detail = false } = {}) {

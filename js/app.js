@@ -1,7 +1,8 @@
 // 路由 + 底部布标导航。页面在 pages/ 里，每页是一个 async 函数，返回 { el, after? }。
 import { loadGrain } from "./ink.js";
 import { watchSwatches } from "./cloth.js";
-import { ink, T, $, h, go } from "./ui.js";
+import { ink, T, $, h } from "./ui.js";
+import * as nav from "./nav.js";
 import * as W from "./pages/wardrobe.js";
 import * as I from "./pages/item.js";
 import * as E from "./pages/edit.js";
@@ -54,41 +55,79 @@ function setNav(cur) {
   }, 6);
 }
 
-async function route() {
-  const raw = location.hash.slice(1) || "/";
+let actionsEl = null, fadeEl = null, seq = 0;
+
+async function route(dir = "none") {
+  const raw = (nav.current() || "#/").slice(1) || "/";
   const [path, qs] = raw.split("?");
   const q = Object.fromEntries(new URLSearchParams(qs || ""));
   if (current) scrolls.set(current, window.scrollY);
+  const prevKey = current;
   current = raw;
-  for (const [re, fn, nav] of ROUTES) {
+  const my = ++seq;
+  for (const [re, fn, navIdx] of ROUTES) {
     const m = path.match(re);
     if (!m) continue;
     try {
       const out = await fn(m.slice(1), q);
-      if (current !== raw) return;              // 等的时候又跳走了
+      if (my !== seq) return;                      // 等的时候又跳走了
+      out.el.style.opacity = "0";
+      // 按钮固定在屏幕下方：从页面里拿出来，放进固定的一层
+      const act = out.el.querySelector(":scope > .actions");
+      actionsEl.replaceChildren();
+      actionsEl.className = "actionbar" + (navIdx != null ? " above-nav" : "");
+      out.el.classList.toggle("has-actions", !!act);
+      out.el.classList.toggle("has-nav", navIdx != null);
+      fadeEl.className = "bottomfade" + (navIdx != null && act ? "" : navIdx != null || act ? " short" : " none");
       view.replaceChildren(out.el);
-      setNav(nav);
-      window.scrollTo(0, scrolls.get(raw) || 0);
+      setNav(navIdx);
+      window.scrollTo(0, dir === "back" || dir === "none" ? (scrolls.get(raw) ?? (prevKey === raw ? scrollY : 0)) : 0);
       out.after?.();
+      out.el.style.opacity = "";
+      out.el.classList.add("enter-" + dir);
+      if (act) { actionsEl.append(act); act.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b) out.el.dispatchEvent(new CustomEvent("act", { detail: b.dataset.act })); }); }
     } catch (e) {
       console.error(e);
       view.replaceChildren(h(`<div class="page">${T("出了点问题：" + e.message)}</div>`));
     }
     return;
   }
-  location.hash = "#/";
+  nav.replace("#/");
 }
 
+// 页面里的链接：底部六页 = 回到根；带 data-back = 往外退一层；带 data-replace = 原地换；其余 = 往里走
+function links(e) {
+  const a = e.target.closest('a[href^="#"]');
+  if (!a || e.defaultPrevented) return;
+  e.preventDefault();
+  const href = a.getAttribute("href");
+  if (a.closest(".nav")) { if (nav.depth() === 0 && nav.current().split("?")[0] === href) { window.scrollTo({ top: 0, behavior: "smooth" }); return; } nav.reset([href]); }
+  else if (a.hasAttribute("data-back")) nav.up(href);
+  else if (a.hasAttribute("data-replace")) nav.replace(href);
+  else nav.push(href);
+}
+
+// 不许缩放：双指缩放、双击放大都拦下
+function noZoom() {
+  for (const ev of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("touchmove", (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+  let last = 0;
+  document.addEventListener("touchend", (e) => { const t = Date.now(); if (t - last < 320 && !e.target.closest("input,textarea,select")) e.preventDefault(); last = t; }, { passive: false });
+}
 
 async function start() {
   buildNav();
+  actionsEl = h(`<div class="actionbar"></div>`);
+  fadeEl = h(`<div class="bottomfade none"></div>`);
+  document.body.append(fadeEl, actionsEl);
   watchSwatches();
+  noZoom();
+  document.addEventListener("click", links);
   await Promise.all([loadGrain("assets/grain.png"), document.fonts?.ready]);
   navigator.storage?.persist?.().catch(() => {});
-  addEventListener("hashchange", route);
-  let rt = 0;
-  addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { scrolls.set(current, scrollY); route(); }, 250); });
-  route();
+  let rt = 0, lastW = innerWidth;
+  addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rt); rt = setTimeout(() => route("none"), 250); });
+  nav.init(route);
   if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 start();

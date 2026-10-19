@@ -1,6 +1,6 @@
 // 0 记：看到的、听到的、穿过之后想到的一句话。每条圈一个它对上的原则；哪条都对不上，就打个问号。
 import { db, uid, rules as getRules } from "../db.js";
-import { T, page, head, drawHead, ink, tape, tapes, md, today, season, go, esc, toast, confirmSheet } from "../ui.js";
+import { T, page, head, drawHead, ink, actions, onAct, md, today, season, go, esc, toast, confirmSheet } from "../ui.js";
 import { noStr, KINDS } from "../kinds.js";
 
 const SRC = ["看到的", "听到的", "穿过之后"];
@@ -18,11 +18,12 @@ export async function notes(_, q) {
       <div><div class="txt">${T(n.text)}</div>${n.itemId && items[n.itemId] ? `<span class="ref">${T("见 " + noStr(items[n.itemId].no) + " " + (items[n.itemId].name || KINDS[items[n.itemId].kind]?.name || ""), "s b")}</span>` : ""}</div>
       <div class="mark">${n.rule ? `<span class="rn">${T(String(n.rule), "m b")}</span>` : T("?", "l b")}</div></a>`;
   const el = page(`
-    <header class="head rel cats src" style="gap:9px;margin-bottom:14px">${T("记", "xl b")}<span style="width:6px"></span>${SRC.map((s) => `<a href="#/notes?s=${s === src ? "" : encodeURIComponent(s)}${byRule ? "&by=rule" : ""}" class="${s === src ? "on" : ""}">${T(s, s === src ? "m b" : "m")}</a>`).join(T("/", "m"))}<span class="grow"></span>${T(`${all.length} 条 · ${season()}`, "m")}</header>
+    <header class="head rel cats src" style="gap:9px;margin-bottom:14px">${T("记", "xl b")}<span style="width:6px"></span>${SRC.map((s) => `<a data-replace href="#/notes?s=${s === src ? "" : encodeURIComponent(s)}${byRule ? "&by=rule" : ""}" class="${s === src ? "on" : ""}">${T(s, s === src ? "m b" : "m")}</a>`).join(T("/", "m"))}<span class="grow"></span>${T(`${all.length} 条`, "m")}</header>
+    ${all.length ? `<p class="viewby" style="margin:-4px 0 6px;text-align:right"><a data-replace href="#/notes?${src ? "s=" + encodeURIComponent(src) + "&" : ""}${byRule ? "" : "by=rule"}" style="padding:6px 0;display:inline-block">${T(byRule ? "按时间看" : "按原则看", "m b")}</a></p>` : ""}
     <div class="list">${list.length ? groups.map(([r, l]) => (r !== undefined ? `<div class="grp" style="margin-top:16px">${T(r ? `${r}  ${rl.list[r - 1]?.text || ""}` : "?  还没写到的", "m b")}</div>` : "") + l.map(entry).join("")).join("")
       : `<div class="empty">${T(all.length ? "这一类还没有。" : "还没有记过。", "l b")}<br>${T("在路上看到的、别人说的、穿出去之后的感觉，", "m")}<br>${T("一句话就够。", "m")}</div>`}</div>
     ${list.length ? `<p style="margin:12px 0 0">${T("* 圈的是对上的那条原则；打问号的，说明原则还没写到。", "s")}</p>` : ""}
-    ${tapes(tape(byRule ? "按时间看" : "按原则看", { act: "group", seed: 1, rot: 0.6 }), tape("记一句", { dark: true, act: "new", seed: 0, rot: -0.5 }))}
+    ${actions({ text: "记一句", act: "new", dark: true })}
   `);
   return {
     el,
@@ -43,8 +44,7 @@ export async function notes(_, q) {
         }
         for (const g of L.querySelectorAll(".grp .ty")) { const b = box(g); sh.underline(b.x - 2, b.r + 4, b.b + 3, 0.6); }
       });
-      el.querySelector('[data-act="new"]').onclick = () => go("#/notes/new");
-      el.querySelector('[data-act="group"]').onclick = () => go(`#/notes?${src ? "s=" + encodeURIComponent(src) + "&" : ""}${byRule ? "" : "by=rule"}`);
+      onAct(el, { new: () => go("#/notes/new") });
     },
   };
 }
@@ -66,7 +66,7 @@ export async function noteEdit([id], q = {}) {
       <div class="row"><span>${T("日期", "m b")}</span><input class="field" type="date" data-f="date" value="${esc(n.date)}"></div>
       ${old ? `<p style="margin:16px 0 0"><button class="del">${T("删掉这条", "m soft")}</button></p>` : ""}
     </div>
-    ${tapes(tape("不记了", { act: "cancel", seed: 2, rot: 0.5 }), tape("记下", { dark: true, act: "save", seed: 1, rot: -0.6 }))}
+    ${actions({ text: old ? "存好" : "记下", act: "save", dark: true })}
   `, { detail: true });
   const circ = (row) => ink(row, "nr" + row.dataset.key + row.querySelector(".on")?.dataset.v, (sh, box) => {
     const on = row.querySelector(".opt.on .ty");
@@ -91,18 +91,18 @@ export async function noteEdit([id], q = {}) {
           return;
         }
         if (e.target.closest(".del")) {
-          if (await confirmSheet("删掉这条？", "删掉")) { await db.del("notes", n.id); go("#/notes"); }
+          if (await confirmSheet("删掉这条？", "删掉")) { await db.del("notes", n.id); go("#/notes", "up"); }
           return;
         }
-        const act = e.target.closest("[data-act]")?.dataset.act;
-        if (act === "cancel") go("#/notes");
-        if (act === "save") {
+      });
+      onAct(el, {
+        save: async () => {
           for (const f of el.querySelectorAll("[data-f]")) n[f.dataset.f] = f.value.trim();
           if (!n.text) { toast("写一句再记"); return; }
           await db.put("notes", n);
           toast("记下了");
-          go("#/notes");
-        }
+          go("#/notes", "up");
+        },
       });
     },
   };

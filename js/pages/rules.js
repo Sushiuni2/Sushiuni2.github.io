@@ -1,7 +1,7 @@
 // 4 原则：六条打在一枚大内标上；下面每条一句怎么用，右边是「记」里对上了几条。改过的旧写法划掉留着。
 // 页尾是备份：记录只在这台手机上，导出一个文件存到「文件」或 iCloud。
 import { db, rules as getRules, exportAll, importAll } from "../db.js";
-import { T, page, head, drawHead, ink, label, tape, tapes, ymd, go, esc, toast, confirmSheet, today } from "../ui.js";
+import { T, page, head, drawHead, ink, label, actions, onAct, ymd, go, esc, toast, confirmSheet, today } from "../ui.js";
 
 const CN = ["", "第一版", "第二版", "第三版", "第四版", "第五版", "第六版", "第七版", "第八版", "第九版"];
 
@@ -26,7 +26,7 @@ export async function rules() {
       <div class="linkrow"><button class="exp">${T("导出备份", "l b")}</button><label>${T("从备份恢复", "l b")}<input type="file" accept="application/json,.json" class="imp"></label></div>
       <div class="linkrow" style="margin-top:8px"><a href="help.html" style="padding:8px 0">${T("怎么用", "m")}</a><a href="privacy.html" style="padding:8px 0">${T("隐私说明", "m")}</a></div>
     </section>
-    ${tapes(tape("看看记", { act: "notes", seed: 1, rot: 0.6 }), tape("改原则", { dark: true, act: "edit", seed: 2, rot: -0.4 }))}
+    ${actions({ text: "改原则", act: "edit", dark: true })}
   `);
   return {
     el,
@@ -38,8 +38,7 @@ export async function rules() {
         for (const n of s.querySelectorAll(".how .n .ty")) { const b = box(n); sh.circle(b.cx, b.cy, 8.4, 0.6, 8); }
         for (const st of s.querySelectorAll(".strk .ty")) { const b = box(st); sh.strike(b.x - 2, b.r + 2, b.cy, 0.55); }
       });
-      el.querySelector('[data-act="edit"]').onclick = () => go("#/rules/edit");
-      el.querySelector('[data-act="notes"]').onclick = () => go("#/notes?by=rule");
+      onAct(el, { edit: () => go("#/rules/edit") });
       el.querySelector(".exp").onclick = async () => {
         const blob = await exportAll();
         const name = `衣柜备份-${today()}.json`;
@@ -55,7 +54,7 @@ export async function rules() {
         const f = e.target.files?.[0];
         if (!f) return;
         if (!(await confirmSheet("用这份备份替换现在手机上的全部记录？", "替换"))) return;
-        try { await importAll(await f.text()); toast("恢复好了"); go("#/"); } catch (err) { toast("恢复失败：" + err.message); }
+        try { await importAll(await f.text()); toast("恢复好了"); go("#/", "reset"); } catch (err) { toast("恢复失败：" + err.message); }
       };
     },
   };
@@ -70,14 +69,13 @@ export async function rulesEdit() {
       <input class="field" data-i="${i}" data-k="text" value="${esc(r.text)}" style="font-size:14px"></div>
       <input class="field" data-i="${i}" data-k="how" value="${esc(r.how)}" placeholder="怎么用" style="margin-left:18px;width:calc(100% - 18px);font-size:12px"></div>`).join("")}
     </div>
-    ${tapes(tape("不改了", { act: "cancel", seed: 0, rot: 0.5 }), tape("存好", { dark: true, act: "save", seed: 1, rot: -0.6 }))}
+    ${actions({ text: "存好", act: "save", dark: true })}
   `, { detail: true });
   return {
     el,
     after() {
       drawHead(el);
-      el.querySelector('[data-act="cancel"]').onclick = () => go("#/rules");
-      el.querySelector('[data-act="save"]').onclick = async () => {
+      onAct(el, { save: async () => {
         let changed = false;
         for (const f of el.querySelectorAll(".field")) {
           const r = rl.list[+f.dataset.i], v = f.value.trim();
@@ -88,8 +86,8 @@ export async function rulesEdit() {
         if (changed) { rl.version = (rl.version || 1) + 1; const d = new Date(); rl.set = `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}`; }
         await db.setMeta("rules", rl);
         toast(changed ? "改好了，旧的留着" : "存好了");
-        go("#/rules");
-      };
+        go("#/rules", "up");
+      } });
     },
   };
 }
