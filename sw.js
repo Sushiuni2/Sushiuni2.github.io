@@ -1,7 +1,7 @@
 // 离线缓存（tools/make_sw.py 生成，别手改）。
 // 一个版本的所有文件放在同一个缓存里，页面只从这一个缓存取，新旧文件不会混在一起。
 // 新版本在后台整版下载好之后，页面让它接管并重新打开一次。
-const VERSION = "82eab0b4ae";
+const VERSION = "e319dfba28";
 const CACHE = "atelier-" + VERSION;
 const FILES = [
 "./",
@@ -48,7 +48,12 @@ const FILES = [
 ];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
+  // 带上版本号去取：GitHub Pages 前面的 CDN 会把旧文件留 10 分钟，不带版本号可能拿到旧的样式配新的脚本
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(FILES.map(async (f) => {
+    const r = await fetch(f + "?v=" + VERSION, { cache: "reload" });
+    if (!r.ok) throw new Error(f + " " + r.status);
+    await c.put(f, r);
+  }))));
 });
 self.addEventListener("message", (e) => { if (e.data === "skip") self.skipWaiting(); });
 self.addEventListener("activate", (e) => {
