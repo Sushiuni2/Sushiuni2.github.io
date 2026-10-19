@@ -1,0 +1,16 @@
+{
+  "name": "衣柜",
+  "short_name": "衣柜",
+  "description": "一本自己的衣柜手稿：衣服、搭配、想买的、原则和身体。记录只存在手机上。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#efebe1",
+  "theme_color": "#efebe1",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
