@@ -88,7 +88,7 @@ export function swatch(color, fabric = "knit", { w = 30, h = 20, stitches = fals
   const r = makeRng(hash("sw" + seed + color));
   const rot = r.normal(0, 2.2).toFixed(2);
   const P = 4;
-  return `<span class="sw" style="width:${w}px;height:${h}px;--rot:${rot}deg"><canvas class="swc" data-c="${(color || [128, 128, 128]).join(",")}" data-f="${FAB[fabric] || "knit"}" data-w="${w}" data-h="${h}" data-st="${stitches ? 1 : 0}" data-hair="${hair ?? (stitches ? 1 : 0.25)}" data-seed="${esc(seed + "|" + color)}" style="left:-${P}px;top:-${P}px;width:${w + 2 * P}px;height:${h + 2 * P}px"></canvas></span>`;
+  return `<span class="sw" style="width:${w}px;height:${h}px;--rot:${rot}deg"><canvas class="swc" data-c="${(color || [128, 128, 128]).join(",")}" data-fab="${FAB[fabric] || "knit"}" data-w="${w}" data-h="${h}" data-st="${stitches ? 1 : 0}" data-hair="${hair ?? (stitches ? 1 : 0.25)}" data-seed="${esc(seed + "|" + color)}" style="left:-${P}px;top:-${P}px;width:${w + 2 * P}px;height:${h + 2 * P}px"></canvas></span>`;
 }
 
 export function tape(text, { dark = false, act = "", seed = 0, rot = 0 } = {}) {

@@ -56,7 +56,7 @@ export async function paintSwatch(cv) {
   cv.dataset.done = "1";
   await loadTex();
   const ds = cv.dataset;
-  const wpt = +ds.w, hpt = +ds.h, col = ds.c.split(",").map(Number), kind = TEX[ds.f] ? ds.f : "knit";
+  const wpt = +ds.w, hpt = +ds.h, col = ds.c.split(",").map(Number), kind = TEX[ds.fab] ? ds.fab : "knit";
   const stitches = ds.st === "1", hair = +ds.hair || 0.2;
   const r = makeRng(hash("swatch" + ds.seed));
   const D = Math.min(window.devicePixelRatio || 1, 3);

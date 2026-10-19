@@ -1,5 +1,5 @@
 // 离线缓存（tools/make_sw.py 生成，别手改）。先用缓存打开，后台再取新的；版本变了就清掉旧缓存。
-const VERSION = "44723563e7";
+const VERSION = "b95e4d05d5";
 const CACHE = "atelier-" + VERSION;
 const FILES = [
 "./",
