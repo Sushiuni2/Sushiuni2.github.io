@@ -27,15 +27,16 @@ export async function front([id]) {
   const el = page(`
     ${head({ backTo: "#/", backText: "衣柜", right: `${noStr(it.no)} · 共 ${total} 件` })}
     <section class="sheetframe">
-      <div class="title">${T("* " + name, "xl b")}</div>
-      <div class="props">${props.map((p) => `<div>${T(p, "m")}</div>`).join("")}</div>
+      <div class="top"><div class="tl">
+        <div class="title">${T("* " + name, "xl b")}</div>
+        <div class="props">${props.map((p) => `<div>${T(p, "m")}</div>`).join("")}</div></div>
+        ${label(rows, "item-label")}</div>
       <div class="itemfig"><div class="mainfig ${it.kind === "cardigan" && !it.photo ? "withback" : ""}"></div>${it.kind === "cardigan" && !it.photo ? `<div class="backwrap"><div class="backfig"></div>${T("背面", "s")}</div>` : ""}</div>
-      <div class="foot2">
-        ${label(rows, "item-label")}
+      <div class="foot">
+        <span class="nostamp">${T(noStr(it.no) + "  '" + String(new Date(it.created || Date.now()).getFullYear()).slice(2), "m")}</span>
         <div class="side">${swatch(it.color, it.fabric, { w: 70, h: 44, stitches: true, seed: it.id + "big" })}
           <span class="seasonbox">${T(season(it.bought || it.created), "l")}</span></div>
       </div>
-      <div class="nostamp">${T(noStr(it.no) + "  '" + String(new Date(it.created || Date.now()).getFullYear()).slice(2), "m")}</div>
     </section>
     ${actions({ text: "翻面看内标", act: "flip" }, { text: it.wears?.includes(today()) ? "今天穿了 ✓" : "今天穿了", act: "wear", dark: true })}
   `, { detail: true });

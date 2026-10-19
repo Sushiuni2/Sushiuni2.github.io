@@ -104,14 +104,6 @@ export function swatch(color, fabric = "knit", { w = 30, h = 20, stitches = fals
   return `<span class="sw" style="width:${w}px;height:${h}px;--rot:${rot}deg"><canvas class="swc" data-c="${(color || [128, 128, 128]).join(",")}" data-fab="${FAB[fabric] || "knit"}" data-w="${w}" data-h="${h}" data-st="${stitches ? 1 : 0}" data-hair="${hair ?? (stitches ? 1 : 0.25)}" data-seed="${esc(seed + "|" + color)}" style="left:-${P}px;top:-${P}px;width:${w + 2 * P}px;height:${h + 2 * P}px"></canvas></span>`;
 }
 
-export function tape(text, { dark = false, act = "", seed = 0, rot = 0 } = {}) {
-  return `<button class="tape ${dark ? "dark" : "light"}" data-act="${act}" style="--rot:${rot}deg;background-image:url(assets/tape_${dark ? "dark" : "light"}_${seed % 3}.png)">${T(text, dark ? "light" : "", "tp")}</button>`;
-}
-
-export function tapes(a, b) {
-  return `<div class="tapes">${a}${b}</div>`;
-}
-
 export function label(rows, cls = "") {
   return `<div class="label ${cls}">${rows.map((r) => r == null ? '<div class="gap"></div>' : `<div class="row">${typeof r === "string" && !r.startsWith("<") ? T(r) : r}</div>`).join("")}</div>`;
 }
@@ -176,13 +168,29 @@ export function go(hash, how = "push") {
   return nav.push(hash);
 }
 
-// 固定在屏幕下方的按钮：一块或两块布标（主按钮是黑布）。点了在页面上发一个 "act" 事件
+// 固定在屏幕下方的按钮：打字 + 一个签字笔画的框（和稿子上「秋 '26」那种框一样）。
+// 主按钮的框描两遍、字加粗；次要的一遍细框。点了在页面上发一个 "act" 事件
 export function actions(...btns) {
   const list = btns.filter(Boolean);
-  const size = list.length === 1 ? "full" : "half";
   return `<div class="actions n${list.length}">${list.map(({ text, act, dark }) =>
-    `<button class="btn ${dark ? "dark" : "light"}" data-act="${act}" style="background-image:url(assets/btn_${size}_${dark ? "dark" : "light"}.png)">${T(text, dark ? "light b" : "b", "btn")}</button>`).join("")}</div>`;
+    `<button class="btn ${dark ? "primary" : "plain"}" data-act="${act}">${T(text, dark ? "b" : "", "btn")}</button>`).join("")}</div>`;
 }
+export function drawButtons(root) {
+  for (const b of root.querySelectorAll(".btn")) {
+    const primary = b.classList.contains("primary");
+    ink(b, "btn" + b.textContent + primary, (sh, box, W, H) => {
+      const r = sh.rng;
+      if (primary) {
+        sh.rect(2, 3, W - 2, H - 3, 0.95, 3);
+        sh.pen([[2 + r.uniform(4, 14), 3 + 2.2], [W - 2 - r.uniform(10, 40), 3 + r.uniform(1.4, 2.8)]], 0.7, { over: 0, wob: 0.3 });
+        sh.pen([[W - 2 - 2.2, 3 + r.uniform(4, 10)], [W - 2 - 2.6, H - 3 - r.uniform(2, 8)]], 0.6, { over: 0, wob: 0.3 });
+      } else {
+        sh.rect(2, 3, W - 2, H - 3, 0.6, 2);
+      }
+    }, 8);
+  }
+}
+
 export const onAct = (el, map) => el.addEventListener("act", (e) => map[e.detail]?.());
 
 // 页面骨架：头部（返回 / 标题 / 右边小字），返回箭头用笔画

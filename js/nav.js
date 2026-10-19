@@ -2,7 +2,7 @@
 // 点进一件衣服、一条记录是往里走一层；返回是往外退一层。退回到根以后，再右滑就没有可退的了。
 // 自己维护一份和浏览器历史一一对应的栈（history.state.i 是层数）。
 
-let stack = [], idx = 0, handler = () => {}, busy = false;
+let stack = [], idx = 0, handler = () => {}, busy = false, want = null;
 const path = (h) => (h || "#/").split("?")[0];
 
 export const current = () => stack[idx] || location.hash || "#/";
@@ -24,6 +24,8 @@ export function init(onRoute) {
     if (ni === idx && stack[idx] === (location.hash || "#/")) return;   // 从垫底那层弹回来，不用重画
     idx = ni;
     stack[idx] = location.hash || "#/";
+    if (want && want !== stack[idx]) { stack[idx] = want; history.replaceState({ ...history.state, i: idx }, "", want); }   // 退回去以后要的是同一页的另一个筛选
+    want = null;
     handler(dir);
   });
   handler("tab");
@@ -62,6 +64,6 @@ export async function reset(paths, dir = "tab") {
 
 // 往外退到 target：历史里有它就退回去（中间的几层一起丢掉）；没有，就把这一层换成它
 export function up(target) {
-  for (let k = idx - 1; k >= 0; k--) if (path(stack[k]) === path(target)) { history.go(k - idx); return; }
+  for (let k = idx - 1; k >= 0; k--) if (path(stack[k]) === path(target)) { want = target.includes("?") ? target : null; history.go(k - idx); return; }
   replace(target, "back");
 }

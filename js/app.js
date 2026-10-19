@@ -1,7 +1,7 @@
 // 路由 + 底部布标导航。页面在 pages/ 里，每页是一个 async 函数，返回 { el, after? }。
 import { loadGrain } from "./ink.js";
 import { watchSwatches } from "./cloth.js";
-import { ink, T, $, h } from "./ui.js";
+import { ink, T, $, h, drawButtons } from "./ui.js";
 import * as nav from "./nav.js";
 import * as W from "./pages/wardrobe.js";
 import * as I from "./pages/item.js";
@@ -12,7 +12,7 @@ import * as Wi from "./pages/wish.js";
 import * as R from "./pages/rules.js";
 import * as B from "./pages/body.js";
 
-const NAV = [["0", "记", "#/notes"], ["1", "衣柜", "#/"], ["2", "搭配", "#/outfits"], ["3", "想买", "#/wish"], ["4", "原则", "#/rules"], ["5", "身体", "#/body"]];
+const NAV = [["0", "记", "#/notes"], ["1", "衣柜", "#/"], ["2", "搭配", "#/outfits"], ["3", "原则", "#/rules"], ["4", "身体", "#/body"]];
 
 const ROUTES = [
   [/^\/?$/, W.wardrobe, 1],
@@ -27,12 +27,12 @@ const ROUTES = [
   [/^\/outfits\/new$/, O.outfitEdit],
   [/^\/outfit\/(\w+)$/, O.outfitView],
   [/^\/outfit\/(\w+)\/edit$/, O.outfitEdit],
-  [/^\/wish$/, Wi.wishes, 3],
+  [/^\/wish$/, async () => ({ redirect: "#/?c=想买" })],
   [/^\/wish\/new$/, Wi.wishEdit],
   [/^\/wish\/(\w+)$/, Wi.wishEdit],
-  [/^\/rules$/, R.rules, 4],
+  [/^\/rules$/, R.rules, 3],
   [/^\/rules\/edit$/, R.rulesEdit],
-  [/^\/body$/, B.body, 5],
+  [/^\/body$/, B.body, 4],
   [/^\/body\/edit$/, B.bodyEdit],
 ];
 
@@ -71,6 +71,7 @@ async function route(dir = "none") {
     try {
       const out = await fn(m.slice(1), q);
       if (my !== seq) return;                      // 等的时候又跳走了
+      if (out.redirect) { nav.replace(out.redirect); return; }
       out.el.style.opacity = "0";
       // 按钮固定在屏幕下方：从页面里拿出来，放进固定的一层
       const act = out.el.querySelector(":scope > .actions");
@@ -85,7 +86,7 @@ async function route(dir = "none") {
       out.after?.();
       out.el.style.opacity = "";
       out.el.classList.add("enter-" + dir);
-      if (act) { actionsEl.append(act); act.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b) out.el.dispatchEvent(new CustomEvent("act", { detail: b.dataset.act })); }); }
+      if (act) { actionsEl.append(act); drawButtons(act); act.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b) out.el.dispatchEvent(new CustomEvent("act", { detail: b.dataset.act })); }); }
     } catch (e) {
       console.error(e);
       view.replaceChildren(h(`<div class="page">${T("出了点问题：" + e.message)}</div>`));
@@ -115,6 +116,21 @@ function noZoom() {
   document.addEventListener("touchend", (e) => { const t = Date.now(); if (t - last < 320 && !e.target.closest("input,textarea,select")) e.preventDefault(); last = t; }, { passive: false });
 }
 
+// 更新：新版本整版下载好以后，让它接管，然后重新打开一次（只在原来已经有旧版本时）
+function updates() {
+  if (!("serviceWorker" in navigator) || !(location.protocol === "https:" || location.hostname === "localhost")) return;
+  const had = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (!had || reloading) return; reloading = true; sessionStorage.setItem("updated", "1"); location.reload(); });
+  navigator.serviceWorker.register("sw.js").then((reg) => {
+    const ask = (w) => { if (w && navigator.serviceWorker.controller) w.postMessage("skip"); };
+    if (reg.waiting) ask(reg.waiting);
+    reg.addEventListener("updatefound", () => { const w = reg.installing; w?.addEventListener("statechange", () => { if (w.state === "installed") ask(w); }); });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reg.update().catch(() => {}); });
+  }).catch(() => {});
+  if (sessionStorage.getItem("updated")) { sessionStorage.removeItem("updated"); setTimeout(() => import("./ui.js").then((u) => u.toast("更新到新版本了")), 600); }
+}
+
 async function start() {
   buildNav();
   actionsEl = h(`<div class="actionbar"></div>`);
@@ -128,6 +144,6 @@ async function start() {
   let rt = 0, lastW = innerWidth;
   addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; clearTimeout(rt); rt = setTimeout(() => route("none"), 250); });
   nav.init(route);
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+  updates();
 }
 start();

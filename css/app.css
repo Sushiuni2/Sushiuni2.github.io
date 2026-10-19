@@ -65,6 +65,7 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 
 .cats { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 12px 0 14px; position: relative; }
 .cats button { padding: 6px 0; }
+.cats .sep { padding: 6px 0; opacity: 0.6; }
 .hr { height: 1px; margin: 6px 0; }
 
 /* ------------------------------------------------------------ 衣柜 */
@@ -91,7 +92,7 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
   box-shadow: 0.8px 1.2px 2.2px rgba(140, 128, 108, 0.30), inset 0 0 4px rgba(150, 130, 90, 0.10);
   transform: rotate(var(--rot, -0.5deg));
 }
-.label::after { content: ""; position: absolute; inset: 4px; border: 4.4px solid transparent; border-image: url(../assets/stitch.png) 13 round; pointer-events: none; }
+.label canvas.stitch { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; }
 .label .gap { height: 0.9em; }
 .label .row { position: relative; z-index: 1; }
 
@@ -101,13 +102,9 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .actionbar:empty { display: none; }
 .actions { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .actions.n2 { grid-template-columns: 1fr 1fr; }
-.btn {
-  height: 46px; background: center / 100% 100% no-repeat; font-size: 15px; letter-spacing: 0.06em;
-  display: flex; align-items: center; justify-content: center; transform: rotate(-0.3deg);
-  filter: drop-shadow(0.6px 1.2px 1.6px rgba(120, 108, 88, 0.38)); transition: transform 0.12s ease, filter 0.12s ease;
-}
-.btn.dark { transform: rotate(0.25deg); }
-.btn:active { transform: translateY(1px) scale(0.985); filter: drop-shadow(0.2px 0.5px 0.6px rgba(120, 108, 88, 0.3)); }
+.btn { height: 48px; position: relative; display: flex; align-items: center; justify-content: center; font-size: 15px; letter-spacing: 0.08em; background: rgba(239, 235, 225, 0.6); transition: transform 0.1s ease, opacity 0.1s ease; }
+.btn.primary { font-size: 16px; }
+.btn:active { transform: translate(0.5px, 1px); opacity: 0.72; }
 .bottomfade { position: fixed; left: 0; right: 0; bottom: 0; height: calc(env(safe-area-inset-bottom) + 150px); z-index: 18; pointer-events: none;
   background: linear-gradient(to bottom, rgba(239, 235, 225, 0), rgba(239, 235, 225, 0.85) 45%, rgba(239, 235, 225, 0.95)); }
 .bottomfade.short { height: calc(env(safe-area-inset-bottom) + 84px); }
@@ -124,7 +121,7 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .nav {
   position: fixed; z-index: 20; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 10px); transform: translateX(-50%) rotate(-0.4deg);
   width: min(354px, calc(100% - 36px)); height: 58px; background: url(../assets/nav.png) center / 100% 100% no-repeat;
-  filter: drop-shadow(0.6px 1px 1.6px rgba(120, 108, 88, 0.35)); display: grid; grid-template-columns: repeat(6, 1fr); padding: 0 12px;
+  filter: drop-shadow(0.6px 1px 1.6px rgba(120, 108, 88, 0.35)); display: grid; grid-template-columns: repeat(5, 1fr); padding: 0 14px;
 }
 .nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; position: relative; }
 .nav a .n { font-size: 12.5px; }
@@ -136,16 +133,17 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .props { margin: 10px 0 0 22px; line-height: 1.75; }
 .itemfig { display: flex; justify-content: center; align-items: center; height: 330px; margin: 14px 0 8px; position: relative; }
 .itemfig .print img { max-height: 300px; }
-.foot2 { display: flex; gap: 14px; align-items: flex-start; margin-top: 6px; }
-.item-label { flex: 1 1 auto; min-width: 0; max-width: 250px; margin: 0 0 0 -32px; padding: 18px 16px 13px 22px; line-height: 1.8; font-size: 11px; z-index: 4; --rot: -0.8deg; }
-.foot2 .side { display: flex; flex-direction: column; align-items: flex-end; gap: 18px; flex: none; padding-top: 8px; }
-.nostamp { margin-top: 14px; white-space: nowrap; }
+.sheetframe .top { display: flex; gap: 10px; align-items: flex-start; }
+.sheetframe .tl { flex: 1; min-width: 0; }
+.item-label { flex: none; width: 176px; margin: -22px -34px 0 0; padding: 18px 14px 14px 18px; line-height: 1.8; font-size: 10.5px; z-index: 4; --rot: -1deg; }
+.foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.foot .side { display: flex; align-items: flex-end; gap: 16px; }
+.nostamp { white-space: nowrap; }
 .seasonbox { white-space: nowrap; }
 .backwrap { position: absolute; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; z-index: 2; }
 .mainfig { position: relative; flex: 1; height: 100%; display: flex; align-items: center; justify-content: center; }
 .mainfig.withback { margin-right: 66px; }
 .mainfig .print img { max-height: 300px; }
-.foot { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 10px; }
 .seasonbox { padding: 6px 10px; }
 
 .table { display: grid; grid-template-columns: 64px repeat(4, 1fr); row-gap: 10px; margin: 12px 0; align-items: baseline; }

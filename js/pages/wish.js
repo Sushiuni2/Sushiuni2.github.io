@@ -21,7 +21,8 @@ function drawRuleSet(sh, box, root) {
   for (const c of root.querySelectorAll(".cnt.few .ty")) { const b = box(c); sh.underline(b.x - 1, b.r + 1, b.b + 3, 0.6, true); }
 }
 
-export async function wishes() {
+// 想买的清单（放在衣柜页「想买」这一栏里）：返回 html 和画墨的函数
+export async function wishSection() {
   const all = await db.all("wishes");
   const open = all.filter((w) => !w.status || w.status === "open").sort((a, b) => a.created.localeCompare(b.created));
   const done = all.filter((w) => w.status === "dropped" || w.status === "bought").sort((a, b) => (b.closed || "").localeCompare(a.closed || ""));
@@ -32,30 +33,25 @@ export async function wishes() {
     ${ruleSet(w)}
     ${w.note ? `<div class="wnote">${T(w.note, "m")}</div>` : ""}
     ${w.status === "dropped" ? `<span class="stamp">${T("不买", "l b")}</span>` : ""}</a>`;
-  const el = page(`
-    ${head({ title: "想买", right: `${open.length} 件 · 冷静 ${WAIT} 天` })}
+  const html = `
     <div class="list">${open.length ? open.map(card).join("") : `<div class="empty">${T("现在没有想买的。", "l b")}<br>${T("看到想要的，先放进来，等 14 天。", "m")}</div>`}</div>
     ${open.length ? `<p style="margin:12px 0 0;line-height:1.9">${T("* 少于三件能搭的，就算再喜欢也先别买。", "s")}<br>${T(`* 满 ${WAIT} 天还想要，再去看一次实物。`, "s")}</p>` : ""}
-    ${done.length ? `<p style="margin:26px 0 0">${T("* 放下的和买了的", "m b")}</p><div class="list done" style="opacity:.75">${done.slice(0, 12).map(card).join("")}</div>` : ""}
-    ${actions({ text: "放进来", act: "new", dark: true })}
-  `);
-  onAct(el, { new: () => go("#/wish/new") });
-  return {
-    el,
-    after() {
-      drawHead(el);
-      for (const L of el.querySelectorAll(".list")) ink(L, "wl" + all.length + L.className, (sh, box, W) => {
-        for (const c of L.querySelectorAll(".wish")) {
-          sh.rule(0, W, box(c).b, 0.32);
-          const st = c.querySelector(".stamp .ty");
-          if (st) { const b = box(st); sh.circle(b.cx, b.cy, b.w / 2 + 10, 0.7, 11); }
-        }
-        drawRuleSet(sh, box, L);
-      });
-      for (const p of el.querySelectorAll(".wphoto")) printPhoto(p, p.dataset.ph, p.dataset.id);
-    },
+    ${done.length ? `<p style="margin:26px 0 0">${T("* 放下的和买了的", "m b")}</p><div class="list done" style="opacity:.75">${done.slice(0, 12).map(card).join("")}</div>` : ""}`;
+  const draw = (el) => {
+    for (const L of el.querySelectorAll(".list")) ink(L, "wl" + all.length + L.className, (sh, box, W) => {
+      for (const c of L.querySelectorAll(".wish")) {
+        sh.rule(0, W, box(c).b, 0.32);
+        const st = c.querySelector(".stamp .ty");
+        if (st) { const b = box(st); sh.circle(b.cx, b.cy, b.w / 2 + 10, 0.7, 11); }
+      }
+      drawRuleSet(sh, box, L);
+    });
+    for (const p of el.querySelectorAll(".wphoto")) printPhoto(p, p.dataset.ph, p.dataset.id);
   };
+  return { html, draw, count: open.length };
 }
+
+export const openWishCount = async () => (await db.all("wishes")).filter((w) => !w.status || w.status === "open").length;
 
 export async function wishEdit([id]) {
   const old = id ? await db.get("wishes", id) : null;
@@ -65,7 +61,7 @@ export async function wishEdit([id]) {
   const sel = new Set(w.matches || []);
   const isOpen = !w.status || w.status === "open";
   const el = page(`
-    ${head({ backTo: "#/wish", backText: "想买", right: old ? dayText(w) : "放进来" })}
+    ${head({ backTo: "#/?c=想买", backText: "想买", right: old ? dayText(w) : "放进来" })}
     <div class="form" style="margin-top:12px">
       <div class="wishfig ${w.photo ? "" : "hide"}"></div>
       <div class="row">${T("照片", "m b")}<div class="linkrow">
@@ -121,10 +117,10 @@ export async function wishEdit([id]) {
       if (!w.name) { toast("写一下是什么"); return; }
       await db.put("wishes", w);
       toast(`放进来了，${WAIT} 天后再看`);
-      go("#/wish", "up");
+      go("#/?c=想买", "up");
     },
-    drop: async () => { collect(); w.status = "dropped"; w.closed = new Date().toISOString(); await db.put("wishes", w); toast("放下了"); go("#/wish", "up"); },
-    reopen: async () => { collect(); w.status = "open"; delete w.closed; await db.put("wishes", w); go("#/wish", "up"); },
+    drop: async () => { collect(); w.status = "dropped"; w.closed = new Date().toISOString(); await db.put("wishes", w); toast("放下了"); go("#/?c=想买", "up"); },
+    reopen: async () => { collect(); w.status = "open"; delete w.closed; await db.put("wishes", w); go("#/?c=想买", "up"); },
     bought: async () => { collect(); await db.put("wishes", w); go(`#/new?wish=${w.id}`); },
   });
   return {
@@ -148,7 +144,7 @@ export async function wishEdit([id]) {
           autosave(); return;
         }
         if (e.target.closest(".rmphoto")) { w.photo = null; w.color = null; showPhoto(); autosave(); return; }
-        if (e.target.closest(".del")) { if (await confirmSheet("删掉这一件？", "删掉")) { await db.del("wishes", w.id); go("#/wish", "up"); } return; }
+        if (e.target.closest(".del")) { if (await confirmSheet("删掉这一件？", "删掉")) { await db.del("wishes", w.id); go("#/?c=想买", "up"); } return; }
       });
       for (const inp of el.querySelectorAll("[data-photo]")) inp.addEventListener("change", async () => {
         const f = inp.files?.[0];

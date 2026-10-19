@@ -173,8 +173,53 @@ function enqueue(cv) {
   if (SWCACHE.has([ck.c, ck.fab, ck.w, ck.h, ck.st, ck.hair, ck.seed, window.devicePixelRatio].join("|"))) paintSwatch(cv);
   else { queue.push(cv); pump(); }
 }
+// 布标一圈明线：一针一针画——线比布略深略黄，每针长 2.5pt、间距 2.3pt，有一点歪，下面压出一点影子
+export function stitchLabel(el) {
+  if (el.querySelector(":scope > canvas.stitch")) return;
+  const W = el.offsetWidth, H = el.offsetHeight;
+  if (!W || !H) return;
+  const D = Math.min(window.devicePixelRatio || 1, 3);
+  const cv = document.createElement("canvas");
+  cv.className = "stitch";
+  cv.width = Math.round(W * D); cv.height = Math.round(H * D);
+  cv.style.width = W + "px"; cv.style.height = H + "px";
+  const x = cv.getContext("2d");
+  x.scale(D, D);
+  const r = makeRng(hash("st" + el.textContent.length + W + H));
+  const ins = 5.5, per = 2 * (W + H - 4 * ins);
+  const at = (u) => {
+    u = ((u % per) + per) % per;
+    if (u < W - 2 * ins) return [ins + u, ins, 0];
+    u -= W - 2 * ins; if (u < H - 2 * ins) return [W - ins, ins + u, 1];
+    u -= H - 2 * ins; if (u < W - 2 * ins) return [W - ins - u, H - ins, 0];
+    u -= W - 2 * ins; return [ins, H - ins - u, 1];
+  };
+  x.lineCap = "round";
+  for (const pass of [0, 1]) {
+    for (let s = r.uniform(0, 4.8); s < per; s += 4.8) {
+      const [x0, y0] = at(s), [x1, y1] = at(s + 2.5 + r.normal(0, 0.12));
+      if (Math.abs(x1 - x0) > 4 || Math.abs(y1 - y0) > 4) continue;     // 拐角处那一针不画
+      const j = r.normal(0, 0.25);
+      if (pass === 0) {                                                // 线压进布里的影子
+        x.strokeStyle = "rgba(120,100,70,0.13)"; x.lineWidth = 1.5;
+        x.beginPath(); x.moveTo(x0 + 0.3, y0 + 0.45 + j); x.lineTo(x1 + 0.3, y1 + 0.45 + j); x.stroke();
+      } else {                                                         // 线本身：中间亮、两头暗一点
+        const g = x.createLinearGradient(x0, y0, x1, y1);
+        g.addColorStop(0, "rgba(206,196,170,0.85)"); g.addColorStop(0.5, "rgba(228,221,200,0.95)"); g.addColorStop(1, "rgba(206,196,170,0.85)");
+        x.strokeStyle = g; x.lineWidth = 0.95;
+        x.beginPath(); x.moveTo(x0, y0 + j); x.lineTo(x1, y1 + j); x.stroke();
+      }
+    }
+  }
+  el.prepend(cv);
+}
+
 export function watchSwatches() {
-  const run = (root) => root.querySelectorAll?.("canvas.swc:not([data-done])").forEach(enqueue);
+  const run = (root) => {
+    root.querySelectorAll?.("canvas.swc:not([data-done])").forEach(enqueue);
+    const labels = root.matches?.(".label") ? [root] : [...(root.querySelectorAll?.(".label") || [])];
+    if (labels.length) requestAnimationFrame(() => labels.forEach(stitchLabel));
+  };
   new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) { if (n.matches?.("canvas.swc")) enqueue(n); else run(n); } })
     .observe(document.body, { childList: true, subtree: true });
   run(document);
