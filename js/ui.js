@@ -1,7 +1,8 @@
 // 页面上的「实物」和字：打字、布标、布带、面料小样、冲印照片、笔画的墨（canvas）。
 import { Sheet, makeRng, hash } from "./ink.js";
 import { drawInBox } from "./garments.js";
-import { photoURL } from "./db.js";
+import { paintTape } from "./cloth.js";
+import { photoURL, photoInfo } from "./db.js";
 import * as nav from "./nav.js";
 
 export const $ = (sel, root = document) => root.querySelector(sel);
@@ -109,11 +110,34 @@ export function label(rows, cls = "") {
 }
 
 export async function printPhoto(el, photoId, seed = "") {
-  const u = await photoURL(photoId);
-  if (!u) return false;
+  const p = await photoInfo(photoId);
+  if (!p) return false;
   const r = makeRng(hash("ph" + seed));
-  el.innerHTML = `<span class="print" style="--rot:${r.normal(0, 1.4).toFixed(2)}deg"><img src="${u}" alt=""></span>`;
+  // 抠过的（带透明的 PNG）：直接躺在纸上，下面一点影子；没抠的：一张白边冲印照片
+  el.innerHTML = p.cut ? `<span class="cutout" style="--rot:${r.normal(0, 1.2).toFixed(2)}deg"><img src="${p.url}" alt=""></span>`
+    : `<span class="print" style="--rot:${r.normal(0, 1.4).toFixed(2)}deg"><img src="${p.url}" alt=""></span>`;
   return true;
+}
+
+// 橡皮章：双线框，两行字，压得不匀，边上被纸纹吃掉一点（墨色，不用红）
+export async function stamp(cv, big, small, seed = "") {
+  try { await Promise.all([document.fonts.load('700 18px "Courier Prime"', "0123")]); } catch {}
+  const W = 168, H = 64, D = Math.min(window.devicePixelRatio || 1, 3), r = makeRng(hash("stamp" + seed + small));
+  cv.width = W * D; cv.height = H * D; cv.style.width = W + "px"; cv.style.height = H + "px";
+  const x = cv.getContext("2d");
+  x.scale(D, D);
+  x.translate(W / 2, H / 2); x.rotate((-5 + r.normal(0, 1.5)) * Math.PI / 180); x.translate(-W / 2, -H / 2);
+  x.strokeStyle = x.fillStyle = "rgba(36,34,40,0.9)";
+  x.lineWidth = 2.4; x.strokeRect(6, 6, W - 12, H - 12);
+  x.lineWidth = 0.9; x.strokeRect(10, 10, W - 20, H - 20);
+  x.textAlign = "center"; x.textBaseline = "middle";
+  x.font = '700 19px "Courier Prime", "PingFang SC", "Noto Sans SC", sans-serif'; x.fillText(big.split("").join(" "), W / 2, H / 2 - 7);
+  x.font = '400 10.5px "Courier Prime", "PingFang SC", "Noto Sans SC", sans-serif'; x.fillText(small, W / 2, H / 2 + 13);
+  // 印泥不匀：大片的浓淡 + 细碎的缺口
+  x.setTransform(D, 0, 0, D, 0, 0);
+  x.globalCompositeOperation = "destination-out";
+  for (let i = 0; i < 26; i++) { x.fillStyle = `rgba(0,0,0,${r.uniform(0.05, 0.25)})`; x.beginPath(); x.ellipse(r.uniform(0, W), r.uniform(0, H), r.uniform(8, 30), r.uniform(4, 14), r.uniform(0, 3), 0, 6.3); x.fill(); }
+  for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(0,0,0,${r.uniform(0.3, 0.9)})`; x.fillRect(r.uniform(0, W), r.uniform(0, H), r.uniform(0.4, 1.3), r.uniform(0.4, 1.3)); }
 }
 
 // 照片优先，没有照片就画稿
@@ -168,28 +192,15 @@ export function go(hash, how = "push") {
   return nav.push(hash);
 }
 
-// 固定在屏幕下方的按钮：打字 + 一个签字笔画的框（和稿子上「秋 '26」那种框一样）。
-// 主按钮的框描两遍、字加粗；次要的一遍细框。点了在页面上发一个 "act" 事件
+// 固定在屏幕下方的按钮。主按钮是一枚白棉布标（四角四针白线，按下去线变黑），次要的是官网那种「▸ 文字」。
+// 点了在页面上发一个 "act" 事件
+// 底部按钮：撕下来的亚麻布带，字印在布上（cloth.js 按实际大小现画）。主要的那个是黑布带，另一个是本白的。
 export function actions(...btns) {
   const list = btns.filter(Boolean);
-  return `<div class="actions n${list.length}">${list.map(({ text, act, dark }) =>
-    `<button class="btn ${dark ? "primary" : "plain"}" data-act="${act}">${T(text, dark ? "b" : "", "btn")}</button>`).join("")}</div>`;
+  return `<div class="actions n${list.length}">${list.map(({ text, act, dark }, i) =>
+    `<button class="tape ${dark ? "dark" : "light"}" data-act="${act}" data-text="${esc(text)}" data-seed="${act}${i}" style="--rot:${[-0.5, 0.6, -0.35][(act.length + i) % 3]}deg"><span class="sr">${esc(text)}</span></button>`).join("")}</div>`;
 }
-export function drawButtons(root) {
-  for (const b of root.querySelectorAll(".btn")) {
-    const primary = b.classList.contains("primary");
-    ink(b, "btn" + b.textContent + primary, (sh, box, W, H) => {
-      const r = sh.rng;
-      if (primary) {
-        sh.rect(2, 3, W - 2, H - 3, 0.95, 3);
-        sh.pen([[2 + r.uniform(4, 14), 3 + 2.2], [W - 2 - r.uniform(10, 40), 3 + r.uniform(1.4, 2.8)]], 0.7, { over: 0, wob: 0.3 });
-        sh.pen([[W - 2 - 2.2, 3 + r.uniform(4, 10)], [W - 2 - 2.6, H - 3 - r.uniform(2, 8)]], 0.6, { over: 0, wob: 0.3 });
-      } else {
-        sh.rect(2, 3, W - 2, H - 3, 0.6, 2);
-      }
-    }, 8);
-  }
-}
+export function drawButtons(root) { root.querySelectorAll(".tape").forEach(paintTape); }
 
 export const onAct = (el, map) => el.addEventListener("act", (e) => map[e.detail]?.());
 

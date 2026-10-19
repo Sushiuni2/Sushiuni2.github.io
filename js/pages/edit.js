@@ -35,6 +35,7 @@ export async function edit([id], q = {}) {
         <label>${T("拍一张", "l")}<input type="file" accept="image/*" capture="environment" data-photo></label>
         <label>${T("从相册选", "l")}<input type="file" accept="image/*" data-photo></label>
         <button class="rmphoto ${it.photo ? "" : "hide"}">${T("去掉", "l soft")}</button></div></div>
+      <p class="tip" style="margin:0 0 6px 62px;line-height:1.6">${T("* 可以先在「照片」里长按衣服把它抠出来，「共享」→「存储图像」，再从相册选这张，它会直接躺在纸上。", "s soft")}</p>
       <div class="kindrow">${optRow("kind", "类型", KIND_ORDER.map((k) => [k, KINDS[k].name]), it.kind)}</div>
       <div class="params-wrap"><p class="ph-note" style="margin:10px 0 0">${T("没有照片时，用下面几项画一张稿：", "s")}</p><div class="params"></div></div>
       ${field("name", "名字", "比如：藏青开衫")}
@@ -43,11 +44,11 @@ export async function edit([id], q = {}) {
       ${optRow("fabric", "面料", FABRICS, it.fabric)}
       <button class="more">${T("＋ 内标和尺寸（可以以后再补）", "m b")}</button>
       <div class="extra ${old && (it.origin || it.price || it.composition || it.story) ? "" : "hide"}">
-        ${field("origin", "来处", "闲鱼、店名、谁送的")}
+        ${field("origin", "原本", "闲鱼、店名、谁送的")}
         <div class="row">${T("入手", "m b")}<input class="field" data-f="bought" type="date" value="${esc((it.bought || "").slice(0, 10))}"></div>
         ${field("price", "价格", "元", "number")}
         ${field("composition", "材质", "羊毛 70 / 尼龙 30，冷水手洗")}
-        <div class="row" style="align-items:start">${T("故事", "m b")}<textarea class="field" data-f="story" placeholder="它有什么来历？换过纽扣？">${esc(it.story || "")}</textarea></div>
+        <div class="row" style="align-items:start">${T("描述", "m b")}<textarea class="field" data-f="story" placeholder="它有什么来历？换过纽扣？">${esc(it.story || "")}</textarea></div>
         <div class="sizes"></div>
       </div>
       <p style="margin:18px 0 0">${T("* 只有类型和颜色要填，其余可以以后再补。", "s")}</p>

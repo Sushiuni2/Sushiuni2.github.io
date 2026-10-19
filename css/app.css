@@ -208,3 +208,5 @@ input[type=file] { display: none; }
 .ghost canvas.ink { mix-blend-mode: normal; }
 .dimnum { position: absolute; z-index: 4; }
 .backfig { width: 78px; height: 96px; position: relative; }
+
+body { --ver: "C"; }

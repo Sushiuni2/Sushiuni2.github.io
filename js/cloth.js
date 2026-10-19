@@ -224,3 +224,162 @@ export function watchSwatches() {
     .observe(document.body, { childList: true, subtree: true });
   run(document);
 }
+
+// ------------------------------------------------------------------ 布带按钮
+// 一条撕下来的亚麻布带：两条长边是织边（直、有一点厚度），两头是撕开的——纬纱被抽出来，长短不齐地垂着。
+// 字是用墨印在布上的：墨落在纱线鼓起的地方，纱缝里浅一点。按按钮的实际大小逐像素现画，不拉伸。
+let linen = null;
+function loadLinen() {
+  if (linen) return linen;
+  linen = new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = im.width; c.height = im.height;
+      const x = c.getContext("2d");
+      x.drawImage(im, 0, 0);
+      const d = x.getImageData(0, 0, im.width, im.height).data;
+      const g = new Float32Array(im.width * im.height);
+      for (let i = 0; i < g.length; i++) g[i] = (d[i * 4] - 128) / 34;
+      res({ g, w: im.width, h: im.height });
+    };
+    im.onerror = () => res(null);
+    im.src = "assets/linen.jpg";
+  });
+  return linen;
+}
+
+const TPAD = 7, TPADY = 3;            // 留给抽出的纱线和影子
+const TAPES = new Map();
+
+function typeInto(x, text, w, h, size, dark, r) {
+  x.font = `700 ${size}px "Courier Prime", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif`;
+  const sp = size * 0.16, chars = [...text];
+  const adv = chars.map((c) => x.measureText(c).width + sp);
+  let cx = (w - adv.reduce((a, b) => a + b, 0) + sp) / 2;
+  const base = h / 2 + size * 0.36;
+  x.lineJoin = "round";
+  for (let i = 0; i < chars.length; i++) {
+    const c = chars[i];
+    x.save();
+    x.translate(cx + adv[i] / 2 - sp / 2 + r.normal(0, 0.12), base + r.normal(0, 0.28));
+    x.rotate(r.normal(0, 0.009));
+    x.globalAlpha = r.uniform(0.8, 1);                                // 打字机：每个字落下的力气不一样
+    x.textAlign = "center";
+    x.fillStyle = x.strokeStyle = "#000";
+    x.lineWidth = dark ? 0.25 : 0.1;                                    // 黑布上白字显细，多描一点
+    x.fillText(c, 0, 0); x.strokeText(c, 0, 0);
+    x.globalAlpha *= 0.18; x.fillText(c, 0.35, 0.3);                  // 墨往布里洇开一点
+    x.restore();
+    cx += adv[i];
+  }
+}
+
+async function renderTape(text, w, h, dark, seed, D) {
+  const L = await loadLinen();
+  const W = Math.round((w + 2 * TPAD) * D), H = Math.round((h + 2 * TPADY) * D);
+  const r = makeRng(hash("tape" + seed + w));
+  // 字先单独画一层
+  const tc = document.createElement("canvas");
+  tc.width = W; tc.height = H;
+  const tx = tc.getContext("2d");
+  tx.scale(D, D); tx.translate(TPAD, TPADY);
+  typeInto(tx, text, w, h, 15, dark, makeRng(hash("ty" + text + seed)));
+  const td = tx.getImageData(0, 0, W, H).data;
+
+  const top = valueNoise(r, W, 1, 40 * D), topJ = valueNoise(r, W, 1, 4 * D);
+  const bot = valueNoise(r, W, 1, 40 * D), botJ = valueNoise(r, W, 1, 4 * D);
+  const lft = valueNoise(r, 1, H, 9 * D), rgt = valueNoise(r, 1, H, 9 * D);
+  const wave = valueNoise(r, W, H, 26 * D);
+  const P = 2.05;                                                      // 一根纬纱占的高度，pt
+  const rows = Math.ceil((h + 2 * TPADY) / P) + 1;
+  const mkEnd = () => Array.from({ length: rows }, () => ({
+    jag: r.normal(0, 0.45),                                            // 撕口一格一格不齐
+    len: r() < 0.62 ? r.uniform(0.6, 3.6) * (r() < 0.12 ? 2.4 : 1) : 0,
+    droop: r.normal(0, 0.05), ph: r.uniform(0, 6.3), th: r.uniform(0.55, 0.85),
+  }));
+  const endL = mkEnd(), endR = mkEnd();
+  const ox = r.int(0, Math.max(1, L ? L.w - W * 3 / D - 2 : 1)), oy = r.int(0, Math.max(1, L ? L.h - H * 3 / D - 2 : 1));
+  const flip = r() < 0.5;
+  const tex = (px, py) => {
+    if (!L) return 0;
+    let u = px * 3 / D, v = py * 3 / D;
+    if (flip) u = W * 3 / D - u;
+    const iu = Math.min(L.w - 1, (ox + u) | 0), iv = Math.min(L.h - 1, (oy + v) | 0);
+    return L.g[iv * L.w + iu];
+  };
+  const base = dark ? [33, 32, 36] : [243, 239, 228];
+  const out = new ImageData(W, H), o = out.data;
+  const tilt = r.normal(0, 0.6);
+  for (let py = 0; py < H; py++) {
+    const Y = (py + 0.5) / D - TPADY;
+    const ri = Math.max(0, Math.min(rows - 1, Math.floor((Y + TPADY) / P)));
+    const rowY = (ri + 0.5) * P - TPADY;
+    const eL = endL[ri], eR = endR[ri];
+    const xl = 2.6 + 1.5 * lft[py] + eL.jag + tilt * (Y / h - 0.5);
+    const xr = w - 2.6 - 1.5 * rgt[py] - eR.jag - tilt * (Y / h - 0.5);
+    for (let px = 0; px < W; px++) {
+      const X = (px + 0.5) / D - TPAD;
+      const t = tex(px, py);
+      const yt = 0.5 + 0.35 * top[px] + 0.12 * topJ[px], yb = h - 0.5 + 0.35 * bot[px] + 0.12 * botJ[px];
+      const dEdge = Math.min(Y - yt, yb - Y), dEnd = Math.min(X - xl, xr - X);
+      let a = sm(-0.6 / D, 0.6 / D, Math.min(dEdge, dEnd));
+      if (dEnd < 1.6 && a > 0) a *= Math.min(1, Math.max(0.15, 0.62 + 0.45 * t + dEnd * 0.25));   // 撕口附近织得松，透出纸
+      // 抽出来的纬纱
+      let fa = 0, fshade = 0;
+      if (dEnd < 0.4 && Y > yt - 0.2 && Y < yb + 0.2) {
+        const e = X < w / 2 ? eL : eR, out_ = X < w / 2 ? xl - X : X - xr;
+        if (e.len > 0 && out_ > -0.4 && out_ < e.len) {
+          const cy = rowY + e.droop * out_ * out_ + 0.18 * Math.sin(out_ * 2.1 + e.ph);
+          const dy = Math.abs(Y - cy);
+          fa = sm(e.th / 2 + 0.5 / D, e.th / 2 - 0.5 / D, dy) * sm(e.len, e.len - 0.6, out_) * 0.92;
+          fshade = (cy - Y) / e.th;                                    // 纱是圆的：上面亮下面暗
+        }
+      }
+      const A = Math.max(a, fa);
+      const i = (py * W + px) * 4;
+      if (A <= 0.003) { o[i + 3] = 0; continue; }
+      let k;
+      if (a >= fa) {
+        k = 1 + 0.018 * wave[py * W + px] + 0.012 * (0.5 - Y / h);
+        if (dEdge < 1.3) k *= Y - yt < yb - Y ? 1 + 0.035 * (1.3 - dEdge) : 1 - 0.07 * (1.3 - dEdge);   // 织边：上缘受光、下缘卷进去一点
+      } else k = (dark ? 1 : 0.94) + 0.07 * fshade;                       // 散开的纱比布面暗一点，看得出是一根根的
+      let c0, c1, c2;
+      if (dark) { const v = 9.5 * t; c0 = (base[0] + v) * k; c1 = (base[1] + v) * k; c2 = (base[2] + v * 1.05) * k; }
+      else { const m = 1 + 0.06 * t; c0 = base[0] * m * k; c1 = base[1] * m * k; c2 = base[2] * m * k; }
+      const ta = td[i + 3] / 255;
+      if (ta > 0 && a > 0) {
+        const ia = ta * Math.min(1, Math.max(0.45, 0.86 + 0.2 * t)) * a;
+        if (dark) { const m = 0.9 + 0.05 * t; c0 += (226 * m - c0) * ia; c1 += (221 * m - c1) * ia; c2 += (208 * m - c2) * ia; }
+        else { c0 *= 1 - ia * (1 - 34 / 255); c1 *= 1 - ia * (1 - 33 / 255); c2 *= 1 - ia * (1 - 38 / 255); }
+      }
+      o[i] = c0; o[i + 1] = c1; o[i + 2] = c2; o[i + 3] = A * 255;
+    }
+  }
+  const c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  c.getContext("2d").putImageData(out, 0, 0);
+  return c;
+}
+
+export async function paintTape(btn) {
+  if (btn.querySelector(":scope > canvas")) return;
+  const w = Math.round(btn.offsetWidth), h = Math.round(btn.offsetHeight);
+  if (!w || !h) return;
+  const D = Math.min(window.devicePixelRatio || 1, 3), dark = btn.classList.contains("dark");
+  const text = btn.dataset.text, seed = btn.dataset.seed || "";
+  await document.fonts?.load(`700 15px "Courier Prime"`, text).catch(() => {});
+  const key = [text, w, h, dark, seed, D].join("|");
+  let src = TAPES.get(key);
+  if (!src) {
+    src = await renderTape(text, w, h, dark, seed, D);
+    TAPES.set(key, src);
+    if (TAPES.size > 40) TAPES.delete(TAPES.keys().next().value);
+  }
+  if (btn.querySelector(":scope > canvas")) return;
+  const cv = document.createElement("canvas");
+  cv.width = src.width; cv.height = src.height;
+  cv.style.cssText = `left:${-TPAD}px;top:${-TPADY}px;width:${w + 2 * TPAD}px;height:${h + 2 * TPADY}px`;
+  cv.getContext("2d").drawImage(src, 0, 0);
+  btn.prepend(cv);
+}

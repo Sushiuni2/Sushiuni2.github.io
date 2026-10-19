@@ -147,3 +147,5 @@ async function start() {
   updates();
 }
 start();
+
+window.__ver = "C";

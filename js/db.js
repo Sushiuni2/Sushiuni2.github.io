@@ -86,20 +86,34 @@ export async function body() { return { ...structuredClone(DEFAULT_BODY), ...((a
 // ------------------------------------------------------------------ 照片：缩到长边 1600，存 JPEG
 export async function savePhoto(file) {
   const bmp = await createImageBitmap(file).catch(() => null);
-  let blob = file;
+  let blob = file, cut = false;
   if (bmp) {
     const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
     const c = document.createElement("canvas");
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
-    blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.86));
+    const x = c.getContext("2d");
+    x.drawImage(bmp, 0, 0, c.width, c.height);
+    // 在「照片」里抠出来的衣服是带透明的 PNG：保留透明，让它直接躺在纸上
+    const t = document.createElement("canvas"); t.width = t.height = 48;
+    t.getContext("2d").drawImage(bmp, 0, 0, 48, 48);
+    const a = t.getContext("2d").getImageData(0, 0, 48, 48).data;
+    let clear = 0;
+    for (let i = 3; i < a.length; i += 4) if (a[i] < 200) clear++;
+    cut = clear > 48 * 48 * 0.06;
+    blob = await new Promise((r) => c.toBlob(r, cut ? "image/png" : "image/jpeg", 0.86));
   }
   const id = uid();
-  await db.put("photos", { id, blob });
+  await db.put("photos", { id, blob, cut });
   return id;
 }
 
 const urlCache = new Map();
+export async function photoInfo(id) {
+  if (!id) return null;
+  const p = await db.get("photos", id);
+  if (!p) return null;
+  return { url: await photoURL(id), cut: !!p.cut };
+}
 export async function photoURL(id) {
   if (!id) return null;
   if (urlCache.has(id)) return urlCache.get(id);
@@ -135,7 +149,8 @@ export async function exportAll() {
   for (const s of ["items", "notes", "outfits", "wishes"]) out[s] = await db.all(s);
   out.meta = { rules: await db.meta("rules"), body: await db.meta("body") };
   out.photos = {};
-  for (const p of await db.all("photos")) out.photos[p.id] = await toDataURL(p.blob);
+  out.cut = {};
+  for (const p of await db.all("photos")) { out.photos[p.id] = await toDataURL(p.blob); if (p.cut) out.cut[p.id] = 1; }
   return new Blob([JSON.stringify(out)], { type: "application/json" });
 }
 
@@ -146,7 +161,7 @@ export async function importAll(text) {
   for (const s of ["items", "notes", "outfits", "wishes"]) for (const o of d[s] || []) await db.put(s, o);
   for (const [id, url] of Object.entries(d.photos || {})) {
     const blob = await (await fetch(url)).blob();
-    await db.put("photos", { id, blob });
+    await db.put("photos", { id, blob, cut: !!d.cut?.[id] });
   }
   if (d.meta?.rules) await db.setMeta("rules", d.meta.rules);
   if (d.meta?.body) await db.setMeta("body", d.meta.body);

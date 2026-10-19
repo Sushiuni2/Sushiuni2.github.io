@@ -1,6 +1,6 @@
 // 单品：正面是一张稿（照片或简笔画、标题、列举、内标、面料小样），背面是一枚大内标、尺寸对照和穿过的日子。
 import { db, body as getBody } from "../db.js";
-import { T, page, head, drawHead, ink, figure, sketch, swatch, label, actions, onAct, season, today, md, ymd, toast, confirmSheet, go } from "../ui.js";
+import { T, page, head, drawHead, ink, figure, sketch, swatch, label, actions, onAct, season, today, md, ymd, toast, confirmSheet, go, stamp } from "../ui.js";
 import { Sheet } from "../ink.js";
 import { drawInBox } from "../garments.js";
 import { KINDS, noStr, summary, fabricName, sizesFor } from "../kinds.js";
@@ -31,7 +31,8 @@ export async function front([id]) {
         <div class="title">${T("* " + name, "xl b")}</div>
         <div class="props">${props.map((p) => `<div>${T(p, "m")}</div>`).join("")}</div></div>
         ${label(rows, "item-label")}</div>
-      <div class="itemfig"><div class="mainfig ${it.kind === "cardigan" && !it.photo ? "withback" : ""}"></div>${it.kind === "cardigan" && !it.photo ? `<div class="backwrap"><div class="backfig"></div>${T("背面", "s")}</div>` : ""}</div>
+      <div class="itemfig"><div class="mainfig ${it.kind === "cardigan" && !it.photo ? "withback" : ""}"></div><span class="selvedge">${T([noStr(it.no), it.colorName, it.composition, it.origin, ymd(it.bought)].filter(Boolean).join(" · "), "s")}</span>${it.kind === "cardigan" && !it.photo ? `<div class="backwrap"><div class="backfig"></div>${T("背面", "s")}</div>` : ""}</div>
+      ${it.wears?.includes(today()) ? `<canvas class="stampmark ${sessionStorage.getItem("justWorn") === it.id ? "fresh" : ""}"></canvas>` : ""}
       <div class="foot">
         <span class="nostamp">${T(noStr(it.no) + "  '" + String(new Date(it.created || Date.now()).getFullYear()).slice(2), "m")}</span>
         <div class="side">${swatch(it.color, it.fabric, { w: 70, h: 44, stitches: true, seed: it.id + "big" })}
@@ -60,6 +61,8 @@ export async function front([id]) {
       figure(el.querySelector(".mainfig"), it, { w: 0.9, pad: 10, dims: dw || dh ? { w: dw ? String(dw) : "", h: dh ? String(dh) : "" } : null });
       const bf = bw?.querySelector(".backfig");
       if (bf) sketch(bf, it, { w: 0.6, pad: 2, params: { ...it.params, back: true }, seed: "back" });
+      const sm = el.querySelector(".stampmark");
+      if (sm) { stamp(sm, "今天穿了", `${ymd(today())} · 第 ${it.wears.length} 次`, it.id); sessionStorage.removeItem("justWorn"); }
       onAct(el, {
         flip: () => go(`#/item/${it.id}/back`),
         wear: async () => {
@@ -68,7 +71,7 @@ export async function front([id]) {
           if (it.wears.includes(d)) { toast("今天已经记过了，在背面可以删"); return; }
           it.wears.push(d);
           await db.put("items", it);
-          toast(`记下了 · 第 ${it.wears.length} 次`);
+          sessionStorage.setItem("justWorn", it.id);
           go("", "refresh");
         },
       });
@@ -80,15 +83,20 @@ export async function back([id]) {
   const { it, total } = await load(id);
   const b = await getBody();
   const name = it.name || KINDS[it.kind]?.name || "";
-  const rows = [`${T("内标  " + noStr(it.no) + " :", "b")}`, null];
-  const end = (s) => (/[。！？.!?]$/.test(s) ? s : s + "。");
-  rows.push("* " + end(`${it.colorName || ""}${name}${it.story ? "，" + it.story : ""}`));
-  rows.push(null);
-  const kv = [["来处", it.origin], ["入手", [ymd(it.bought), it.price ? it.price + " 元" : ""].filter(Boolean).join("，")], ["材质", [it.composition, it.care].filter(Boolean).join("，")]];
-  for (const [k, v] of kv) if (v) rows.push(`* ${k}：${v}`);
-  if (!kv.some(([, v]) => v)) rows.push("* 来处、价格、材质都还空着。");
-  rows.push(null);
-  rows.push(`. 衣柜 ${noStr(it.no)} / ${total} .`);
+  // 照 Replica 的标签：粗体标题、一行小字，几项「原本 / 来处与时期 / 材质 / 描述」，回答是灰色打字写在点线上；空着的也留一条点线
+  const end = (x) => (/[。！？.!?]$/.test(x) ? x : x + "。");
+  const fields = [
+    ["Originally", "原本", it.origin],
+    ["Provenance and Period", "来处与时期", [it.year ? `约 ${it.year} 年` : "", ymd(it.bought) && `${ymd(it.bought)} 入手`, it.price ? it.price + " 元" : ""].filter(Boolean).join("，")],
+    ["Fabric", "材质", [it.composition, it.care].filter(Boolean).join("，")],
+    ["Style Description", "描述", it.story ? end(`${it.colorName || ""}${name}，${it.story}`) : end(`${it.colorName || ""}${name}`)],
+  ];
+  const replica = `<div class="label back-label replica">
+    <div class="rh">${T("REPLICA", "rp")}<span class="rno">${T(noStr(it.no), "b")}</span></div>
+    <div class="rsub">${T("一件衣服，和它经过的地方与时间。", "s")}</div>
+    ${fields.map(([en, zh, v]) => `<div class="rf"><span class="rk">${T(en + " " + zh + "：", "s b")}</span><div class="ra">${v ? T(v, "m") : "&nbsp;"}</div></div>`).join("")}
+    <div class="rfoot">${T(`衣柜 ${noStr(it.no)} / ${total}`, "s")}</div>
+  </div>`;
   const S = sizesFor(it.kind);
   const hasSizes = S.length && S.some(([k]) => it.sizes?.[k]);
   const diff = (k) => { const a = +it.sizes?.[k], c = +b.base?.[k]; return a && c ? a - c : null; };
@@ -96,7 +104,7 @@ export async function back([id]) {
   const el = page(`
     ${head({ backTo: `#/item/${it.id}`, backText: "正面", right: `${noStr(it.no)} · 背面` })}
     <div class="ghost"></div>
-    ${label(rows, "back-label")}
+    ${replica}
     ${S.length ? `<section class="rel sizes" style="margin-top:34px">
       <div class="h2" style="display:inline-block">${T("* 尺寸  cm", "l b")}</div>
       ${hasSizes ? `<div class="table">
