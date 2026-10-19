@@ -16,7 +16,8 @@ export function ty(text, seed = "") {
     if (ch === " ") { out += " "; continue; }
     const o = r.uniform(0.7, 1).toFixed(2), y = r.normal(0, 0.22).toFixed(2);
     const bx = Math.round(r() * 300), by = Math.round(r() * 300);
-    out += `<i style="--o:${o};--y:${y}px;--bx:${bx}px;--by:${by}px">${esc(ch)}</i>`;
+    const cjk = ch.codePointAt(0) >= 0x2e80 ? ' class="c"' : "";
+    out += `<i${cjk} style="--o:${o};--y:${y}px;--bx:${bx}px;--by:${by}px">${esc(ch)}</i>`;
   }
   return out;
 }
@@ -57,9 +58,25 @@ export function ink(container, seed, draw, bleed = 14) {
 }
 
 // 一件衣服的小稿，画进一个固定尺寸的框
-export function sketch(el, item, { w = 0.62, pad = 6 } = {}) {
-  ink(el, "sk" + item.id, (sh, box, W, H) => {
-    drawInBox(sh, item.kind, item.params || {}, [pad, pad, W - 2 * pad, H - 2 * pad], { w });
+// dims = { w: "44", h: "64" }：在稿子上面拉一道量宽度的线、左边一道量长度的线，数字打字
+export function sketch(el, item, { w = 0.62, pad = 6, dims = null, params = null, seed = "" } = {}) {
+  el.querySelectorAll(".dimnum").forEach((d) => d.remove());
+  ink(el, "sk" + item.id + seed, (sh, box, W, H) => {
+    const p = params || item.params || {};
+    const g = drawInBox(sh, item.kind, p, [pad, pad + (dims ? 18 : 0), W - 2 * pad - (dims ? 18 : 0), H - 2 * pad - (dims ? 18 : 0)], { w });
+    if (!dims || !g) return;
+    const inset = (g.x1 - g.x0) * 0.12;
+    const tick = (a, b) => sh.pen([a, b], 0.5, { over: 0, wob: 0.1 });
+    if (dims.w) {
+      const y = g.y0 - 10, xa = g.x0 + inset, xb = g.x1 - inset;
+      sh.pen([[xa, y], [xb, y]], 0.5, { over: 0, wob: 0.15 }); tick([xa, y - 3], [xa, y + 3]); tick([xb, y - 3], [xb, y + 3]);
+      el.append(h(`<span class="dimnum" style="left:${(xa + xb) / 2 - 7}px;top:${y - 15}px">${T(dims.w, "m")}</span>`));
+    }
+    if (dims.h) {
+      const x = Math.max(4, g.x0 - 10), ya = g.y0, yb = g.y1;
+      sh.pen([[x, ya], [x, yb]], 0.5, { over: 0, wob: 0.15 }); tick([x - 3, ya], [x + 3, ya]); tick([x - 3, yb], [x + 3, yb]);
+      el.append(h(`<span class="dimnum" style="left:${x + 4}px;top:${(ya + yb) / 2 - 6}px">${T(dims.h, "m")}</span>`));
+    }
   }, 4);
 }
 
@@ -67,12 +84,11 @@ export function sketch(el, item, { w = 0.62, pad = 6 } = {}) {
 export const rgb = (c) => `rgb(${(c || [128, 128, 128]).join(",")})`;
 const FAB = { knit: "knit", linen: "linen", poplin: "poplin", jersey: "jersey" };
 
-export function swatch(color, fabric = "knit", { w = 30, h = 20, stitches = false, seed = "" } = {}) {
+export function swatch(color, fabric = "knit", { w = 30, h = 20, stitches = false, seed = "", hair = null } = {}) {
   const r = makeRng(hash("sw" + seed + color));
   const rot = r.normal(0, 2.2).toFixed(2);
-  const st = stitches ? [[7, 7, -42], [w - 7, 7, 42], [7, h - 7, 42], [w - 7, h - 7, -42]].map(([x, y, a]) =>
-    `<b class="thread" style="left:${x}px;top:${y}px;transform:translate(-50%,-50%) rotate(${a + r.normal(0, 4)}deg)"></b>`).join("") : "";
-  return `<span class="sw" style="width:${w}px;height:${h}px;--rot:${rot}deg"><span class="cloth fab-${FAB[fabric] || "knit"} fray-${r.int(0, 3)}" style="background-color:${rgb(color)}"></span>${st}</span>`;
+  const P = 4;
+  return `<span class="sw" style="width:${w}px;height:${h}px;--rot:${rot}deg"><canvas class="swc" data-c="${(color || [128, 128, 128]).join(",")}" data-f="${FAB[fabric] || "knit"}" data-w="${w}" data-h="${h}" data-st="${stitches ? 1 : 0}" data-hair="${hair ?? (stitches ? 1 : 0.25)}" data-seed="${esc(seed + "|" + color)}" style="left:-${P}px;top:-${P}px;width:${w + 2 * P}px;height:${h + 2 * P}px"></canvas></span>`;
 }
 
 export function tape(text, { dark = false, act = "", seed = 0, rot = 0 } = {}) {
@@ -97,9 +113,10 @@ export async function printPhoto(el, photoId, seed = "") {
 
 // 照片优先，没有照片就画稿
 export async function figure(el, item, opts = {}) {
-  if (item.photo && await printPhoto(el, item.photo, item.id)) return;
+  if (item.photo && await printPhoto(el, item.photo, item.id)) return "photo";
   el.innerHTML = "";
   sketch(el, item, opts);
+  return "sketch";
 }
 
 export function toast(text) {
@@ -145,8 +162,8 @@ export function page(inner, { detail = false } = {}) {
   return h(`<div class="page${detail ? " detail" : ""}">${inner}</div>`);
 }
 export function head({ title = "", sub = "", right = "", backTo = "", backText = "" } = {}) {
-  const b = backTo ? `<a class="back" href="${backTo}" data-back><span class="arr" style="display:inline-block;width:8px;height:12px"></span>${T(backText, "l b")}</a>` : "";
-  return `<header class="head rel">${b}${title ? T(title, "xl b") : ""}${sub ? T(sub, "m") : ""}<span class="grow"></span>${right ? T(right, "m") : ""}</header>`;
+  const b = backTo ? `<a class="back" href="${backTo}" data-back><span class="arr" style="display:inline-block;width:8px;height:12px"></span>${T(backText, "hb b")}</a>` : "";
+  return `<header class="head rel">${b}${title ? T(title, "xl b") : ""}${sub ? T(sub, "m") : ""}<span class="grow"></span>${right ? T(right, backTo ? "l" : "m") : ""}</header>`;
 }
 export function drawHead(el, extra) {
   const hd = el.querySelector(".head");

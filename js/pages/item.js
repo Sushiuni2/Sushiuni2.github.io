@@ -1,6 +1,8 @@
 // 单品：正面是一张稿（照片或简笔画、标题、列举、内标、面料小样），背面是一枚大内标、尺寸对照和穿过的日子。
 import { db, body as getBody } from "../db.js";
-import { T, page, head, drawHead, ink, figure, swatch, label, tape, tapes, season, today, md, ymd, toast, confirmSheet, go } from "../ui.js";
+import { T, page, head, drawHead, ink, figure, sketch, swatch, label, tape, tapes, season, today, md, ymd, toast, confirmSheet, go } from "../ui.js";
+import { Sheet } from "../ink.js";
+import { drawInBox } from "../garments.js";
 import { KINDS, noStr, summary, fabricName, sizesFor } from "../kinds.js";
 
 async function load(id) {
@@ -32,7 +34,8 @@ export async function front([id]) {
       <div class="itemfig"></div>
       <div class="foot">
         ${T(noStr(it.no) + "  '" + String(new Date(it.created || Date.now()).getFullYear()).slice(2), "m")}
-        <div style="display:flex;align-items:flex-end;gap:18px">${swatch(it.color, it.fabric, { w: 70, h: 44, stitches: true, seed: it.id + "big" })}
+        <div style="display:flex;align-items:flex-end;gap:16px">${it.kind === "cardigan" && !it.photo ? `<div style="display:flex;flex-direction:column;align-items:center;gap:2px"><div class="backfig"></div><span class="bk">${T("背面", "s")}</span></div>` : ""}
+        ${swatch(it.color, it.fabric, { w: 70, h: 44, stitches: true, seed: it.id + "big" })}
         <span class="seasonbox">${T(season(it.bought || it.created), "l")}</span></div>
       </div>
     </section>
@@ -52,7 +55,11 @@ export async function front([id]) {
         const s = box(fr.querySelector(".seasonbox"));
         sh.rect(s.x, s.y, s.r, s.b, 0.65, 2.5);
       });
-      figure(el.querySelector(".itemfig"), it, { w: 0.9, pad: 10 });
+      const S = it.sizes || {};
+      const dw = S.shoulder || S.waist || "", dh = S.length || S.inseam || "";
+      figure(el.querySelector(".itemfig"), it, { w: 0.9, pad: 10, dims: dw || dh ? { w: dw ? String(dw) : "", h: dh ? String(dh) : "" } : null });
+      const bf = el.querySelector(".backfig");
+      if (bf) sketch(bf, it, { w: 0.6, pad: 2, params: { ...it.params, back: true }, seed: "back" });
       el.querySelector('[data-act="flip"]').onclick = () => go(`#/item/${it.id}/back`);
       el.querySelector('[data-act="wear"]').onclick = async () => {
         const d = today();
@@ -85,6 +92,7 @@ export async function back([id]) {
   const wears = [...(it.wears || [])].sort().reverse();
   const el = page(`
     ${head({ backTo: `#/item/${it.id}`, backText: "正面", right: `${noStr(it.no)} · 背面` })}
+    <div class="ghost"></div>
     ${label(rows, "back-label")}
     ${S.length ? `<section class="rel sizes" style="margin-top:34px">
       <div class="h2" style="display:inline-block">${T("* 尺寸  cm", "l b")}</div>
@@ -93,7 +101,9 @@ export async function back([id]) {
         <span>${T("这一件", "s")}</span>${S.map(([k]) => `<span class="c">${T(it.sizes?.[k] || "—", "m")}</span>`).join("")}
         <span>${T("基准面", "s")}</span>${S.map(([k]) => `<span class="c">${T(b.base?.[k] || "—", "m")}</span>`).join("")}
         <span>${T("差", "s b")}</span>${S.map(([k]) => { const d = diff(k); return `<span class="c"><span class="d ${d != null && Math.abs(d) >= 2 ? "big" : ""}">${T(d == null ? "" : (d > 0 ? "+" : "") + d, "m b")}</span></span>`; }).join("")}
-      </div>` : `<p>${T("还没量。在「修改内标」里填上，就能和「身体」页的基准面对照。", "m soft")}</p>`}
+      </div>${(() => { const k = S.find(([k]) => { const d = diff(k); return d != null && Math.abs(d) >= 2; }); if (!k) return "";
+        const d = diff(k[0]), word = { shoulder: ["宽", "窄"], chest: ["宽", "窄"], length: ["长", "短"], sleeve: ["长", "短"], waist: ["大", "小"], hip: ["大", "小"], inseam: ["长", "短"], hem: ["宽", "窄"] }[k[0]];
+        return `<p class="dnote" style="text-align:right;margin:20px 6px 0 0">${T(`${k[1]}比基准面${d > 0 ? word[0] : word[1]} ${Math.abs(d)} cm。`, "m")}</p>`; })()}` : `<p>${T("还没量。在「修改内标」里填上，就能和「身体」页的基准面对照。", "m soft")}</p>`}
     </section>` : ""}
     <section class="rel wears" style="margin-top:28px">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="h2">${T(`* 穿过 ${wears.length} 次`, "l b")}</span>${perWear(it) ? T("每次 " + perWear(it), "m") : ""}</div>
@@ -105,6 +115,13 @@ export async function back([id]) {
     el,
     after() {
       drawHead(el);
+      const gh = el.querySelector(".ghost");
+      gh.style.top = el.querySelector(".head").offsetHeight + 30 + "px";
+      gh.style.height = "560px";
+      ink(gh, "gh" + it.id, (sh, box, W, H) => {
+        sh.frame(2, 4, W - 2, H - 4);
+        drawInBox(sh, it.kind, it.params || {}, [30, 150, W - 60, 330], { w: 0.9 });
+      });
       for (const sec of el.querySelectorAll("section.rel")) {
         ink(sec, "bk" + sec.className + it.id, (sh, box, W) => {
           const hd = box(sec.querySelector(".h2 .ty"));
@@ -115,6 +132,8 @@ export async function back([id]) {
             sh.rule(0, W, row1.b + 5, 0.45);
             sh.rule(0, W, last.b + 6, 0.45);
             for (const d of sec.querySelectorAll(".d.big .ty")) { const c = box(d); sh.circle(c.cx, c.cy, Math.max(13, c.w / 2 + 6), 0.6, 9.5); }
+            const first = sec.querySelector(".d.big .ty"), note = sec.querySelector(".dnote .ty");
+            if (first && note) { const c = box(first), n = box(note); sh.arrow([n.x + 10, n.y - 2], [c.cx + 6, c.b + 6], 0.45); }
           }
         });
       }

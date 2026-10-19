@@ -34,7 +34,7 @@ export async function wardrobe(_, q) {
       });
       for (const f of el.querySelectorAll(".fig")) {
         const it = items.find((i) => i.id === f.dataset.id);
-        figure(f, it, { w: 0.62, pad: 8 });
+        figure(f, it, { w: 0.74, pad: it.kind === "derby" ? 26 : 16 });
       }
     },
   };

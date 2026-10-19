@@ -14,7 +14,7 @@
 html, body { margin: 0; min-height: 100%; }
 body {
   background: var(--paper) url(../assets/paper.jpg) 0 0 / 100% auto repeat-y;
-  font-family: var(--font); font-weight: 600; font-size: 11px; color: var(--ink);
+  font-family: var(--font); font-weight: 600; font-size: 9.2px; color: var(--ink);
   -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%;
   overflow-x: hidden; overscroll-behavior-y: none;
 }
@@ -33,7 +33,9 @@ a { color: inherit; text-decoration: none; }
 .ty.light i { background-image: url(../assets/ink_light.png); -webkit-text-stroke: 0.2px rgba(240, 236, 224, 0.35); }
 .ty.b { font-weight: 800; }
 .ty.soft { opacity: 0.62; }
-.s { font-size: 9.5px; } .m { font-size: 11px; } .l { font-size: 13px; } .xl { font-size: 18px; letter-spacing: 0.02em; }
+.s { font-size: 8px; } .m { font-size: 9.2px; } .l { font-size: 10.5px; } .xl { font-size: 15px; letter-spacing: 0.02em; }
+.ty i.c { font-size: 0.9em; }
+.hb { font-size: 12.5px; }
 
 /* ------------------------------------------------------------ 页面 */
 #view { position: relative; }
@@ -71,20 +73,12 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .fig .print { max-height: 100%; }
 .fig .print img { max-height: 150px; }
 
-.sw { position: relative; display: inline-block; transform: rotate(var(--rot)); filter: drop-shadow(0.9px 1.4px 1.2px rgba(120, 108, 88, 0.35)); flex: none; }
-.sw .cloth { position: absolute; inset: 0; background-size: 90px; background-blend-mode: overlay; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; }
-.fab-knit { background-image: url(../assets/fab_knit.png); }
-.fab-linen { background-image: url(../assets/fab_linen.png); }
-.fab-poplin { background-image: url(../assets/fab_poplin.png); }
-.fab-jersey { background-image: url(../assets/fab_jersey.png); }
-.fray-0 { -webkit-mask-image: url(../assets/fray_0.png); mask-image: url(../assets/fray_0.png); }
-.fray-1 { -webkit-mask-image: url(../assets/fray_1.png); mask-image: url(../assets/fray_1.png); }
-.fray-2 { -webkit-mask-image: url(../assets/fray_2.png); mask-image: url(../assets/fray_2.png); }
-.thread { position: absolute; width: 9px; height: 4px; background: url(../assets/thread.png) 0 0 / 100% 100%; }
+.sw { position: relative; display: inline-block; transform: rotate(var(--rot)); flex: none; }
+.sw .swc { position: absolute; display: block; }
 
 .label {
   position: relative; background: #f6f2e6 url(../assets/poplin.jpg) 0 0 / 160px;
-  padding: 22px 20px 18px; line-height: 2.05;
+  padding: 24px 20px 18px; line-height: 1.92; font-size: 8.6px;
   box-shadow: 0.8px 1.2px 2.2px rgba(140, 128, 108, 0.30), inset 0 0 4px rgba(150, 130, 90, 0.10);
   transform: rotate(var(--rot, -0.5deg));
 }
@@ -95,7 +89,7 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .tapes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 28px 0 0; }
 .tape {
   height: 50px; background: center / 100% 100% no-repeat; transform: rotate(var(--rot, 0));
-  filter: drop-shadow(0.6px 1.5px 1.4px rgba(120, 108, 88, 0.36)); font-size: 15px; display: flex; align-items: center; justify-content: center;
+  filter: drop-shadow(0.6px 1.5px 1.4px rgba(120, 108, 88, 0.36)); font-size: 13.5px; display: flex; align-items: center; justify-content: center;
   transition: transform 0.12s ease;
 }
 .tape:active { transform: rotate(var(--rot, 0)) scale(0.97); }
@@ -107,8 +101,8 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
   filter: drop-shadow(0.6px 1px 1.6px rgba(120, 108, 88, 0.35)); display: grid; grid-template-columns: repeat(6, 1fr); padding: 0 12px;
 }
 .nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; position: relative; }
-.nav a .n { font-size: 12px; }
-.nav a .w { font-size: 10px; }
+.nav a .n { font-size: 11px; }
+.nav a .w { font-size: 9.5px; }
 
 /* ------------------------------------------------------------ 单品 */
 .sheetframe { position: relative; margin: 14px 2px 0; padding: 22px 18px 18px; min-height: 540px; }
@@ -118,7 +112,7 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .itemfig .print img { max-height: 300px; }
 .sheetframe .top { display: flex; gap: 10px; align-items: flex-start; }
 .sheetframe .tl { flex: 1; min-width: 0; }
-.item-label { flex: none; width: 172px; margin: -40px -30px 0 0; padding: 18px 16px 14px; line-height: 1.85; font-size: 9.5px; z-index: 4; --rot: -0.8deg; }
+.item-label { flex: none; width: 168px; margin: -40px -30px 0 0; padding: 18px 15px 13px; line-height: 1.97; font-size: 7.6px; z-index: 4; --rot: -0.8deg; }
 .foot { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 10px; }
 .seasonbox { padding: 6px 10px; }
 
@@ -128,12 +122,12 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .dates button { text-align: left; padding: 2px 0; }
 
 /* ------------------------------------------------------------ 表单 */
-.form .row { display: grid; grid-template-columns: 52px 1fr; align-items: center; min-height: 40px; position: relative; padding: 4px 0; }
+.form .row { display: grid; grid-template-columns: 52px 1fr; align-items: center; min-height: 36px; position: relative; padding: 4px 0; }
 .opts { display: flex; flex-wrap: wrap; gap: 2px 8px; }
 .opt { padding: 8px 6px; position: relative; min-width: 28px; }
-.field { width: 100%; background: transparent; border: 0; border-bottom: 0.6px solid rgba(40, 39, 44, 0.32); padding: 8px 0 6px; font-size: 13px; font-weight: 600; outline: none; border-radius: 0; }
+.field { width: 100%; background: transparent; border: 0; border-bottom: 0.6px solid rgba(40, 39, 44, 0.32); padding: 8px 0 6px; font-size: 11px; font-weight: 600; outline: none; border-radius: 0; }
 .field::placeholder { color: rgba(40, 39, 44, 0.32); }
-textarea.field { resize: none; min-height: 96px; line-height: 1.8; font-size: 13px; }
+textarea.field { resize: none; min-height: 96px; line-height: 1.8; font-size: 11px; }
 .chips { display: flex; flex-wrap: wrap; gap: 14px 14px; align-items: center; padding: 6px 0; }
 .chip { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; position: relative; padding: 2px; }
 .more { margin: 16px 0 4px; display: inline-block; padding: 8px 0; }
@@ -151,7 +145,7 @@ input[type=file] { display: none; }
 
 /* ------------------------------------------------------------ 记 / 搭配 / 想买 / 原则 / 身体 */
 .entry { display: grid; grid-template-columns: 64px 1fr 30px; gap: 0 4px; padding: 14px 0 16px; position: relative; }
-.entry .txt { line-height: 1.75; font-size: 11.5px; }
+.entry .txt { line-height: 1.85; font-size: 9.2px; }
 .entry .ref { margin-top: 4px; display: inline-block; }
 .entry .mark { text-align: center; padding-top: 1px; }
 .track { padding: 14px 0 18px; position: relative; display: block; }
@@ -165,16 +159,22 @@ input[type=file] { display: none; }
 .ruleset { display: flex; align-items: center; gap: 2px; margin: 10px 0 6px; flex-wrap: wrap; }
 .ruleset .n { width: 24px; text-align: center; padding: 6px 0; position: relative; }
 .stamp { position: absolute; right: 6px; bottom: 16px; padding: 6px 10px; }
-.rules-label { margin: 18px 6px 0; padding: 26px 24px 20px; font-size: 12.5px; line-height: 2.2; }
+.rules-label { margin: 18px 6px 0; padding: 30px 24px 22px; font-size: 10px; line-height: 1.9; }
 .how { display: grid; grid-template-columns: 30px 1fr auto; gap: 4px; padding: 10px 0; align-items: start; }
 .how .old { margin-top: 2px; }
 .stock { position: relative; height: 380px; margin-top: 8px; }
 .stock .note { position: absolute; left: 172px; right: 0; line-height: 1.7; }
 .colors { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
 
-.toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 18px); transform: translate(-50%, -8px) rotate(-1deg); opacity: 0; transition: 0.25s; z-index: 50; background: #f6f2e6 url(../assets/poplin.jpg) 0 0/160px; padding: 10px 16px; box-shadow: 0.8px 1.4px 3px rgba(120, 108, 88, 0.35); font-size: 12px; }
+.toast { font-size: 10px; position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 18px); transform: translate(-50%, -8px) rotate(-1deg); opacity: 0; transition: 0.25s; z-index: 50; background: #f6f2e6 url(../assets/poplin.jpg) 0 0/160px; padding: 10px 16px; box-shadow: 0.8px 1.4px 3px rgba(120, 108, 88, 0.35); }
 .toast.on { opacity: 1; transform: translate(-50%, 0) rotate(-1deg); }
 .modal { position: fixed; inset: 0; z-index: 60; background: rgba(239, 235, 225, 0.72); display: flex; align-items: center; justify-content: center; padding: 30px; }
 .sheetlabel { width: 100%; max-width: 330px; font-size: 13px; }
 .choices { display: flex; justify-content: flex-end; gap: 28px; margin-top: 18px; }
 .choices button { padding: 8px 4px; }
+
+/* 背面：正面的墨从纸背透过来，镜像、很淡 */
+.ghost { position: absolute; left: 0; right: 0; top: 0; pointer-events: none; transform: scaleX(-1); opacity: 0.12; filter: blur(0.9px); z-index: 0; }
+.ghost canvas.ink { mix-blend-mode: normal; }
+.dimnum { position: absolute; z-index: 4; }
+.backfig { width: 78px; height: 96px; position: relative; }

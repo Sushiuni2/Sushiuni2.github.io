@@ -18,8 +18,7 @@ export async function notes(_, q) {
       <div><div class="txt">${T(n.text)}</div>${n.itemId && items[n.itemId] ? `<span class="ref">${T("见 " + noStr(items[n.itemId].no) + " " + (items[n.itemId].name || KINDS[items[n.itemId].kind]?.name || ""), "s b")}</span>` : ""}</div>
       <div class="mark">${n.rule ? `<span class="rn">${T(String(n.rule), "m b")}</span>` : T("?", "l b")}</div></a>`;
   const el = page(`
-    ${head({ title: "记", right: `${all.length} 条 · ${season()}` })}
-    <nav class="cats src">${SRC.map((s) => `<a href="#/notes?s=${s === src ? "" : encodeURIComponent(s)}${byRule ? "&by=rule" : ""}" class="${s === src ? "on" : ""}">${T(s, s === src ? "m b" : "m")}</a>`).join(`<span>${T("/", "m")}</span>`)}</nav>
+    <header class="head rel cats src" style="gap:9px;margin-bottom:14px">${T("记", "xl b")}<span style="width:6px"></span>${SRC.map((s) => `<a href="#/notes?s=${s === src ? "" : encodeURIComponent(s)}${byRule ? "&by=rule" : ""}" class="${s === src ? "on" : ""}">${T(s, s === src ? "m b" : "m")}</a>`).join(T("/", "m"))}<span class="grow"></span>${T(`${all.length} 条 · ${season()}`, "m")}</header>
     <div class="list">${list.length ? groups.map(([r, l]) => (r !== undefined ? `<div class="grp" style="margin-top:16px">${T(r ? `${r}  ${rl.list[r - 1]?.text || ""}` : "?  还没写到的", "m b")}</div>` : "") + l.map(entry).join("")).join("")
       : `<div class="empty">${T(all.length ? "这一类还没有。" : "还没有记过。", "l b")}<br>${T("在路上看到的、别人说的、穿出去之后的感觉，", "m")}<br>${T("一句话就够。", "m")}</div>`}</div>
     ${list.length ? `<p style="margin:12px 0 0">${T("* 圈的是对上的那条原则；打问号的，说明原则还没写到。", "s")}</p>` : ""}

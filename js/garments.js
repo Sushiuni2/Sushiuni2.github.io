@@ -287,7 +287,8 @@ export function drawInBox(sh, kind, params, [bx, by, bw, bh], { w = 0.62, hatchN
   f(sh, OX, OY, SC, { ...params, w });
   if (hatchNeck && sh.shade.neck) sh.hatch(sh.shade.neck, { angle: 74, gap: Math.max(1.0, 1.35 * Math.sqrt(SC)), w: Math.max(0.26, 0.42 * Math.sqrt(SC)), seg: [40 * SC + 10, 120 * SC], skip: [0.5, 1.5] });
   if (hatchNeck && sh.shade.heel) sh.hatch(sh.shade.heel, { angle: 62, gap: 1.2, w: 0.3, seg: [20, 40], skip: [0.5, 1.2] });
-  return SC;
+  // 画出来的范围（页面坐标），量尺寸的线照它摆
+  return { SC, x0: OX + x0 * SC, y0: OY + y0 * SC, x1: OX + x1 * SC, y1: OY + y1 * SC };
 }
 
 // Stockman 人台（身体页）

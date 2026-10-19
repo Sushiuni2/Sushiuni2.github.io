@@ -1,5 +1,6 @@
 // 路由 + 底部布标导航。页面在 pages/ 里，每页是一个 async 函数，返回 { el, after? }。
 import { loadGrain } from "./ink.js";
+import { watchSwatches } from "./cloth.js";
 import { ink, T, $, h, go } from "./ui.js";
 import * as W from "./pages/wardrobe.js";
 import * as I from "./pages/item.js";
@@ -81,6 +82,7 @@ async function route() {
 
 async function start() {
   buildNav();
+  watchSwatches();
   await Promise.all([loadGrain("assets/grain.png"), document.fonts?.ready]);
   navigator.storage?.persist?.().catch(() => {});
   addEventListener("hashchange", route);
