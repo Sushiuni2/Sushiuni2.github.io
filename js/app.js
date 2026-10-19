@@ -86,7 +86,7 @@ async function route(dir = "none") {
       out.after?.();
       out.el.style.opacity = "";
       out.el.classList.add("enter-" + dir);
-      if (act) { actionsEl.append(act); drawButtons(act); act.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (b) out.el.dispatchEvent(new CustomEvent("act", { detail: b.dataset.act })); }); }
+      if (act) { actionsEl.append(act); drawButtons(act); act.addEventListener("click", (e) => { const b = e.target.closest("[data-act]"); if (!b) return; b.classList.add("busy"); setTimeout(() => b.classList.remove("busy"), 700); out.el.dispatchEvent(new CustomEvent("act", { detail: b.dataset.act })); }); }
     } catch (e) {
       console.error(e);
       view.replaceChildren(h(`<div class="page">${T("出了点问题：" + e.message)}</div>`));
@@ -147,5 +147,3 @@ async function start() {
   updates();
 }
 start();
-
-window.__ver = "C";

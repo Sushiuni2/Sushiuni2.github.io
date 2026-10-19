@@ -1,7 +1,7 @@
 // 离线缓存（tools/make_sw.py 生成，别手改）。
 // 一个版本的所有文件放在同一个缓存里，页面只从这一个缓存取，新旧文件不会混在一起。
 // 新版本在后台整版下载好之后，页面让它接管并重新打开一次。
-const VERSION = "e319dfba28";
+const VERSION = "35f8d18dd2";
 const CACHE = "atelier-" + VERSION;
 const FILES = [
 "./",

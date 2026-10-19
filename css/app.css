@@ -1,4 +1,4 @@
-/* 一张米白的稿纸：字是打字机打的，线是签字笔画的，按钮是撕下来的布带，导航是一枚缝上去的布标。 */
+/* 一张米白的稿纸：字是打字机打的（拉丁 Courier Prime，中文朱雀仿宋），线是签字笔画的，按钮和导航是缝上去的白布标。 */
 @font-face { font-family: "Courier Prime"; src: url(../fonts/CourierPrime-Bold.ttf) format("truetype"); font-weight: 600 900; unicode-range: U+0000-02FF, U+2000-206F, U+20A0-20CF; font-display: block; }
 @font-face { font-family: "Courier Prime"; src: url(../fonts/CourierPrime-Regular.ttf) format("truetype"); font-weight: 100 500; unicode-range: U+0000-02FF, U+2000-206F, U+20A0-20CF; font-display: block; }
 
@@ -96,15 +96,19 @@ canvas.ink { position: absolute; pointer-events: none; mix-blend-mode: multiply;
 .label .gap { height: 0.9em; }
 .label .row { position: relative; z-index: 1; }
 
-/* 按钮：和导航同一种棉布标，固定在屏幕下方 */
+/* 按钮：撕下来的亚麻布带（cloth.js 现画），固定在屏幕下方 */
 .actionbar { position: fixed; z-index: 19; left: 50%; transform: translateX(-50%); width: min(354px, calc(100% - 36px)); bottom: calc(env(safe-area-inset-bottom) + 12px); }
-.actionbar.above-nav { bottom: calc(env(safe-area-inset-bottom) + 78px); }
+.actionbar.above-nav { bottom: calc(env(safe-area-inset-bottom) + 80px); }
 .actionbar:empty { display: none; }
-.actions { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.actions.n2 { grid-template-columns: 1fr 1fr; }
-.btn { height: 48px; position: relative; display: flex; align-items: center; justify-content: center; font-size: 15px; letter-spacing: 0.08em; background: rgba(239, 235, 225, 0.6); transition: transform 0.1s ease, opacity 0.1s ease; }
-.btn.primary { font-size: 16px; }
-.btn:active { transform: translate(0.5px, 1px); opacity: 0.72; }
+.actions { display: flex; gap: 16px; align-items: center; justify-content: center; }
+.actions.n1 .tape { flex: none; width: 62%; }
+.tape { flex: 1; height: 46px; position: relative; transform: rotate(var(--rot, 0deg)); transition: transform 0.12s ease; -webkit-tap-highlight-color: transparent; }
+.tape canvas { position: absolute; pointer-events: none; filter: drop-shadow(0.5px 1.3px 1.3px rgba(110, 96, 72, 0.34)); transition: filter 0.12s ease; }
+.tape.dark canvas { filter: drop-shadow(0.6px 1.5px 1.5px rgba(60, 50, 36, 0.42)); }
+.tape:active, .tape.busy { transform: rotate(var(--rot, 0deg)) translateY(1px) scale(0.985); }
+.tape:active canvas, .tape.busy canvas { filter: drop-shadow(0.2px 0.5px 0.6px rgba(110, 96, 72, 0.3)); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@keyframes blink { 50% { opacity: 0; } }
 .bottomfade { position: fixed; left: 0; right: 0; bottom: 0; height: calc(env(safe-area-inset-bottom) + 150px); z-index: 18; pointer-events: none;
   background: linear-gradient(to bottom, rgba(239, 235, 225, 0), rgba(239, 235, 225, 0.85) 45%, rgba(239, 235, 225, 0.95)); }
 .bottomfade.short { height: calc(env(safe-area-inset-bottom) + 84px); }
@@ -209,4 +213,25 @@ input[type=file] { display: none; }
 .dimnum { position: absolute; z-index: 4; }
 .backfig { width: 78px; height: 96px; position: relative; }
 
-body { --ver: "C"; }
+/* 背面内标：照 Replica 的标签 */
+.replica { padding: 24px 22px 18px; line-height: 1.5; }
+.replica .rh { display: flex; align-items: baseline; justify-content: space-between; }
+.replica .rp { font-weight: 700; font-size: 22px; letter-spacing: 0.01em; -webkit-text-stroke: 0; }
+.replica .rno { font-size: 13px; }
+.replica .rsub { margin: 2px 0 12px; }
+.replica .rf { margin-top: 9px; }
+.replica .rk .ty { font-size: 10px; letter-spacing: 0.02em; }
+.replica .ra { border-bottom: 1px dotted rgba(40, 39, 44, 0.75); padding: 2px 0 2px 12px; min-height: 22px; opacity: 0.72; }
+.replica .rfoot { margin-top: 14px; text-align: right; }
+/* 照片边上竖着的一行布边小字 */
+.itemfig .selvedge { position: absolute; right: -14px; top: 6px; writing-mode: vertical-rl; letter-spacing: 0.14em; opacity: 0.7; white-space: nowrap; max-height: 100%; overflow: hidden; }
+.itemfig .selvedge .ty { font-size: 9px; }
+/* 今天穿了：一枚橡皮章压在稿纸上 */
+.stampmark { position: absolute; left: 12px; bottom: 58px; z-index: 5; mix-blend-mode: multiply; pointer-events: none; }
+.stampmark.fresh { animation: stampIn 0.42s cubic-bezier(0.25, 1.4, 0.5, 1) both; }
+@keyframes stampIn { 0% { opacity: 0; transform: scale(1.35) rotate(-3deg); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+/* 抠过的衣服：直接躺在纸上 */
+.cutout { display: inline-flex; transform: rotate(var(--rot, 0)); max-width: 100%; max-height: 100%; }
+.cutout img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0.5px 3px 4px rgba(80, 66, 40, 0.30)) saturate(0.95); }
+.fig .cutout img { max-height: 160px; } .mainfig .cutout img { max-height: 310px; } .thumb .fig .cutout img { max-height: 60px; } .picker .fig .cutout img { max-height: 70px; } .wphoto .cutout img { max-height: 76px; max-width: 70px; } .wishfig .cutout img { max-height: 190px; }
+.sheetframe { position: relative; }
